@@ -3,6 +3,8 @@ import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { ClinicWorkspace } from './workspace/ClinicWorkspace'
 import { LoginPage } from './pages/LoginPage'
+import { ClinicRegistrationPage } from './pages/ClinicRegistrationPage'
+import { InvitationAcceptancePage } from './pages/InvitationAcceptancePage'
 import { PlatformAdminLoginPage } from './pages/PlatformAdminLoginPage'
 import { PlatformAdminPage } from './pages/PlatformAdminPage'
 
@@ -12,6 +14,8 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register-clinic" element={<ClinicRegistrationPage />} />
+          <Route path="/accept-invitation" element={<InvitationAcceptancePage />} />
           <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Navigate to="/workspace/command-center" replace />} />

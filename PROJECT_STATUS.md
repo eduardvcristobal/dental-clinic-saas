@@ -22,7 +22,7 @@
 | M0.5 | Role-specific application shell & connected UI previews | Implemented — review/verification pending | Responsive navigation, safe demo state, role-based previews, tests |
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
-| M1 | Clinics, branches, dentists, chairs, staff | Not started | Complete tenant/branch onboarding, permissions and CRUD with tests |
+| M1 | Clinics, branches, dentists, chairs, staff | M1.1–M1.3 implemented; validation pending | Complete tenant/branch onboarding, permissions and CRUD with tests |
 | M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
 | M4 | Odontogram | Not started | Adult/primary tooth surfaces, statuses, historical entries |
@@ -180,3 +180,22 @@ See `docs/M1_CLINIC_MANAGEMENT_REPORT.md`. No M1 completion or production-ready 
 - [ ] Email invitation delivery, hosted CI, deployment rate limits and outstanding Platform Admin privilege review.
 
 See `docs/M1_2_ONBOARDING_REPORT.md`. Do not treat M1.2 as fully tested or safe for clinical production until M1.3 is complete.
+
+## M1.3 — Security and onboarding integration (2026-10-19)
+
+**Status: Implemented, runtime and production verification BLOCKED.**
+
+- [x] Added dedicated first-clinic registration and staff invitation acceptance React routes.
+- [x] Added forward-only V14 policy hardening to remove blanket Platform Admin table access created by V11.
+- [x] Restricted Platform Admin dashboard to clinic-directory metadata; no clinical record aggregates queried.
+- [x] Extended PostgreSQL-dependent migration and RLS tests to V14 and platform-admin denial checks.
+- [x] Added negative onboarding unit tests and prepared validation report.
+- [ ] Run JDK 17 Maven test suite on actual Java 17 and PostgreSQL (this environment lacks JDK 17, Maven and PG).
+- [ ] Execute fresh V1–V14 migrations and check existing-database upgrade from V13.
+- [ ] Run full two-clinic invitation acceptance, concurrency/replay and audit event integration suite.
+- [ ] Verify genuine Google browser signup and invitation acceptance.
+- [ ] Verify frontend build, lint, tests, responsive design and hosted CI.
+- [ ] Close M0.4 outstanding provider/CI and platform security review before production activation.
+
+**Security/verification report:** `docs/M1_3_SECURITY_VALIDATION_REPORT.md`.
+**Do not activate real patient data or claim M1.3 production complete until all security gates pass.**

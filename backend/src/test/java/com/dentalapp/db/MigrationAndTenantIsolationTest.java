@@ -55,11 +55,16 @@ class MigrationAndTenantIsolationTest {
     void migratesFreshSchemaAndEnforcesRlsAndTenantRelationshipsForRuntimeRole() throws Exception {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
-        assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
+        assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
                 """, Integer.class)).isGreaterThanOrEqualTo(25);
+
+        // A platform-wide session must not bypass tenant RLS for clinical records.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND policyname='platform_admin_access'", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='staff_invitation' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='clinic_admin_event' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
 
         UUID clinicA = UUID.randomUUID(), clinicB = UUID.randomUUID();
         UUID userB = UUID.randomUUID();
@@ -85,6 +90,16 @@ class MigrationAndTenantIsolationTest {
                 assertThrows(SQLException.class, () -> s.execute("INSERT INTO patient(clinic_id,chart_no,first_name,last_name) VALUES ('"+clinicB+"','spoof','Spoof','Patient')"));
             }
             app.rollback();
+        }
+        // Earlier V11's global permission must no longer reveal patient rows.
+        try (Connection app = appConnection(); var s = app.createStatement()) {
+            s.execute("SELECT set_config('app.platform_admin','true',false)");
+            try (var rs = s.executeQuery("SELECT count(*) FROM patient")) {
+                rs.next(); assertThat(rs.getInt(1)).isZero();
+            }
+            try (var rs = s.executeQuery("SELECT count(*) FROM app_user")) {
+                rs.next(); assertThat(rs.getInt(1)).isZero();
+            }
         }
         TenantContext.set(clinicA);
         try (Connection pooled = dataSource.getConnection(); var s = pooled.createStatement(); var rs = s.executeQuery("SELECT count(*) FROM patient")) {

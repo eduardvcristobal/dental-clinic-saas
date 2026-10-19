@@ -10,8 +10,7 @@ interface ClinicSummary {
   subscriptionStatus: string
   active: boolean
   createdAt: string
-  staffCount: number
-  patientCount: number
+  accessScope: string
 }
 
 export function PlatformAdminPage() {
@@ -45,12 +44,12 @@ export function PlatformAdminPage() {
         {!loading && clinics.length > 0 && (
           <div className="card" style={{ overflowX: 'auto', marginTop: '1rem' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead><tr><th>Clinic</th><th>Slug</th><th>Status</th><th>Plan</th><th>Staff</th><th>Patients</th></tr></thead>
+              <thead><tr><th>Clinic</th><th>Slug</th><th>Status</th><th>Plan</th><th>Access scope</th></tr></thead>
               <tbody>{clinics.map((clinic) => (
                 <tr key={clinic.id}>
                   <td>{clinic.name}</td><td><code>{clinic.slug}</code></td>
                   <td>{clinic.active ? clinic.subscriptionStatus : 'INACTIVE'}</td><td>{clinic.planCode}</td>
-                  <td>{clinic.staffCount}</td><td>{clinic.patientCount}</td>
+                  <td>Clinic directory only</td>
                 </tr>
               ))}</tbody>
             </table>

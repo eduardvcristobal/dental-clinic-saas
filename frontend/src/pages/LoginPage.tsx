@@ -85,6 +85,8 @@ export function LoginPage() {
             {error}
           </p>
         )}
+        <Link to="/register-clinic" className="muted small">Register a clinic (when enabled)</Link>
+        <Link to="/accept-invitation" className="muted small">Accept an invitation</Link>
         <Link to="/platform-admin/login" className="muted small">Platform administrator sign in</Link>
       </section>
     </main>
