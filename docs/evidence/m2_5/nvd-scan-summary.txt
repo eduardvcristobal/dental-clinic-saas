@@ -1,0 +1,12 @@
+NVD / Maven Dependency-Check
+- NVD API key: read from the private config file without outputting it; a minimal authenticated NVD API request returned HTTP 200.
+- Direct full-feed attempts with Dependency-Check 12.1.0 stalled at 78%, and 12.1.1 stalled at 97%. Neither partial attempt is counted as a completed scan.
+- Completed scan: Dependency-Check Maven 12.1.6, Java 17.0.20; NVD 2.0 data via the Dependency-Check maintained feed mirror. Feed mirror is updated on a best-effort daily cadence; results should be rerun against current direct NVD data before production deployment.
+- NVD cache checked: 2026-10-19T23:39:10Z
+- NVD cache last modified: 2026-10-19T17:17:24Z
+- Dependencies: 84 scanned (54 unique), 13 vulnerable, 179 dependency/CVE matches, 114 unique CVEs.
+- Unique CVE severity by highest score: CRITICAL 25, HIGH 44, MEDIUM 39, LOW 6.
+- Severity by dependency/CVE match: CRITICAL 35, HIGH 66, MEDIUM 67, LOW 11.
+- Outcome: FAIL at configured `failBuildOnCVSS=7`; 25 critical and 44 high unique CVEs are unresolved. No suppressions or manual applicability review were applied.
+- CISA KEV update completed. Sonatype OSS Index was skipped because this machine has no OSS Index user/password credentials. This run is an NVD/KEV assessment, not a complete multi-source SCA review.
+- Full generated reports (not committed; excluded from delivery ZIPs as build artifacts): `backend/target/dependency-check-report.html` and `backend/target/dependency-check-report.json`.

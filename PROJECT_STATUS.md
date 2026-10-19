@@ -1,14 +1,14 @@
 ## Current milestone snapshot
 
-M2 patient management is implemented through M2.4 and locally regressed under M2.5. All local checks pass; hosted CI for the final M2.5 source is BLOCKED by unavailable GitHub authentication. M2 remains open. Do not start M3 or use real patient data.
+M2 patient management is implemented through M2.4 and locally regressed under M2.5. CI-equivalent local tests pass, but hosted CI is BLOCKED by unavailable GitHub authentication and the NVD scan failed the CVSS threshold with unresolved critical/high dependency matches. M2 remains open. Do not start M3 or use real patient data.
 
 # Dental Clinic SaaS — Project Status
 
-**Last updated:** 2026-10-19  
+**Last updated:** 2026-10-20
 **Authoritative baseline:** M1.4.6 accepted source plus M2.1–M2.4 implementation; M2.5 local regression in progress
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M1 complete for development; M2 local regression and functional checks pass, but M2 remains open pending hosted CI evidence; NVD dependency assessment is deferred to M10; **not production-ready**.
+**Overall status:** M1 complete for development; M2 remains open pending hosted CI and remediation/triage of critical/high NVD dependency findings; **not production-ready**.
 
 ## Progress conventions
 
@@ -27,7 +27,7 @@ M2 patient management is implemented through M2.4 and locally regressed under M2
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
 | M1 | Clinics, branches, dentists, chairs, staff | **COMPLETE FOR DEVELOPMENT — live E2E and hosted CI passed; production gates remain open** | Complete tenant/branch onboarding, permissions, real-account browser E2E, security and CI gates |
-| M2 | Patients, medical history, consent, search | **In progress — local validation passed; hosted CI blocked** | Registration to searchable protected patient chart; all M2 gates plus hosted CI evidence |
+| M2 | Patients, medical history, consent, search | **In progress — hosted CI blocked; NVD threshold failed** | Registration to searchable protected patient chart; final CI and high/critical dependency finding disposition required |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
 | M4 | Odontogram | Not started | Adult/primary tooth surfaces, statuses, historical entries |
 | M5 | Visits and clinical documentation | Not started | SOAP notes, signed addenda, files, prescriptions |
@@ -342,7 +342,7 @@ See [M1.4.6 final acceptance report](docs/M1_4_6_FINAL_ACCEPTANCE_REPORT.md), [l
 - Guardian contacts are self-reported, and administrative consent acknowledgement is not a signature or permission to treat.
 - V14→V15 upgrade preserved the synthetic history and legacy consent fields. Review legacy consent meaning before production migration.
 
-See `docs/M2_2_DELIVERY_REPORT.md` and the M2.5 PostgreSQL and security reports. NVD remains deferred to M10 and is a production gate.
+See `docs/M2_2_DELIVERY_REPORT.md` and the M2.5 PostgreSQL and security reports. NVD was deferred at the earlier M2.2 checkpoint; the current M2.5 scan completed and failed its CVSS threshold. Current findings are summarized under M2.5 below.
 
 ## M2.3 — Patient 360° integration and regression (2026-10-19)
 
@@ -357,7 +357,7 @@ See `docs/M2_3_INTEGRATION_REPORT.md` and `docs/M2_5_FRONTEND_BROWSER_REGRESSION
 
 ## M2.4 — Patient identity, guardian and consent security regression (2026-10-19)
 
-**Status: Local security regressions passed under M2.5; overall M2 acceptance remains open pending hosted CI.**
+**Status: Local security regressions passed under M2.5; overall M2 acceptance remains open pending hosted CI and dependency finding disposition.**
 
 - Patient 360° renders only the currently selected record; stale async responses and foreign UUIDs are denied in local authenticated regression.
 - Guardian relationships remain unverified; UNSIGNED/ACKNOWLEDGED statuses do not constitute signed informed consent.
@@ -367,9 +367,9 @@ See `docs/M2_3_INTEGRATION_REPORT.md` and `docs/M2_5_FRONTEND_BROWSER_REGRESSION
 See `docs/M2_4_SECURITY_REGRESSION_REPORT.md` and `docs/M2_5_SECURITY_FINDINGS.md`.
 
 
-## M2.5 — Full Runtime Regression & Patient Management Acceptance (2026-10-19)
+## M2.5 — Full Runtime Regression & Patient Management Acceptance (updated 2026-10-20)
 
-**Status: IN PROGRESS — local development acceptance checks passed; M2 is not complete because hosted CI evidence is blocked.** Do not start M3 or use real patient data.
+**Status: IN PROGRESS — M2 remains open.** Local CI-equivalent checks passed, but hosted CI is blocked and the NVD scan failed the CVSS threshold with critical/high dependency matches. Do not start M3 or use real patient data.
 
 - [x] Java 17.0.20 `mvn -B -ntp clean verify`: 53 backend tests passed, 0 failed, 0 skipped; JAR package/repackage passed.
 - [x] PostgreSQL 18.6 fresh V1–V15 migration and restricted-role two-clinic RLS/relationship checks passed.
@@ -379,12 +379,16 @@ See `docs/M2_4_SECURITY_REGRESSION_REPORT.md` and `docs/M2_5_SECURITY_FINDINGS.m
 - [x] Authenticated Chromium Playwright with a local synthetic Google JWKS and isolated backend/PostgreSQL: patient workflow, duplicate review, guardian/history/consent, archive, delayed patient switching, cross-clinic denial, and role denial passed (1/1).
 - [x] Offline/mocked Playwright UI suite passed 12/12 across Chromium, Firefox, WebKit; each browser tested desktop/tablet/mobile layout coverage. This is distinct from live-backend coverage.
 - [x] Auth/session/invitation and patient-care DTO string forms redact sensitive values; Spring MVC body/request-parameter logging is not debug-enabled, even under ambient DEBUG. Final live backend logs contained neither JWTs nor patient/clinical test values.
+- [x] 2026-10-20 local CI-equivalent rerun: 53 backend tests, 26 frontend unit tests, and 4 Chromium workflow browser tests passed; typecheck/build/lint and Gitleaks passed (lint retains two warnings; Gitleaks found no leaks in the scanned commits).
+- [x] OWASP Dependency-Check 12.1.6 completed using the Dependency-Check maintained NVD 2.0 mirror and generated HTML/JSON reports. Results: 84 dependencies scanned (54 unique); 13 matched vulnerable; 179 dependency/CVE matches; 114 unique CVEs (25 critical, 44 high, 39 medium, 6 low by highest severity). The configured `failBuildOnCVSS=7` policy failed as intended. No applicability triage or suppressions have been applied.
+- [x] Local NVD API key presence was checked without printing it; a minimal authenticated NVD API request returned HTTP 200. Full direct API feed downloads hung at 78% on Dependency-Check 12.1.0 and 97% on 12.1.1, so the completed local scan used the upstream-maintained mirror. The optional workflow now uses 12.1.6 with connection/read timeouts and a retry limit.
 - [ ] Hosted GitHub Actions on the final M2.5 application commit: **BLOCKED**. `gh auth status` reports an invalid stored credential; GitHub API access failed. No current hosted run is claimed.
+- [ ] Critical/high dependency findings must be triaged and remediated; the scan's affected-version matching is best-effort and no manual applicability review has been done. Sonatype OSS Index was skipped because no credentials were configured.
 - [ ] Live Google provider authentication is not part of the synthetic authenticated Playwright run; prior M1 acceptance evidence is documented separately.
 - [ ] Review the V14→V15 legacy consent mapping before production: existing signed metadata is preserved, while the new `consent_status` default is `UNSIGNED` and is not proof of consent.
-- [ ] The accepted Maven NVD dependency scan remains **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10. A completed Maven vulnerability assessment is required before production deployment.
+- [ ] Complete and review the Maven vulnerability assessment before production deployment. The current completed scan is **FAIL** at the configured CVSS threshold; its mirror is best-effort and is not a production approval.
 
-**Test totals:** 92 passed (53 backend + 26 frontend unit + 12 mocked browser + 1 live authenticated browser), 0 failed, 0 skipped, 1 blocked release gate (hosted CI). NVD assessment is deferred separately, not passed.
+**Latest rerun test totals:** 83 passed (53 backend + 26 frontend unit + 4 Chromium workflow browser tests), 0 failed, 0 skipped. NVD threshold result: **FAIL** (separate security gate). Hosted CI: **BLOCKED**. Earlier M2.5 wider regression totals remain 92 passed (53 backend + 26 frontend unit + 12 cross-browser mocked + 1 live authenticated browser).
 
 **Security boundary:** M2 development acceptance does not authorize real patient information or production clinical workflows. No automatic patient merges are implemented; duplicate detection remains advisory. Guardian relationships remain unverified; administrative consent acknowledgement is not a signed informed consent.
 

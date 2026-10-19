@@ -7,6 +7,17 @@
 - `npm test -- --reporter=dot`: PASS, 6 test files and 26 tests.
 - `npm run build`: PASS; TypeScript project build and Vite production bundle (51 modules) succeeded.
 
+## 2026-10-20 CI-equivalent rerun
+
+- `npm ci --no-audit --no-fund`: PASS using the committed lockfile.
+- `npx tsc -b`: PASS.
+- `npm run lint`: PASS with the same two asynchronous `set-state-in-effect` warnings and no errors.
+- `npm test -- --reporter=dot`: PASS, 6 files and 26 tests.
+- `npm run build`: PASS.
+- `npm run test:e2e -- --reporter=line`: PASS, all 4 workflow Chromium tests.
+
+This rerun used the workflow's default single-browser suite. The earlier 12-test Chromium/Firefox/WebKit regression remains separately recorded above; the live authenticated Playwright run was not repeated in this rerun.
+
 ## Authenticated live Playwright
 
 **PASS — 1 Chromium test** against the actual local Spring Boot backend and a new isolated PostgreSQL database. An ephemeral local RSA/JWKS service issued short-lived synthetic Google-compatible test identities. No real Google account, credential, or identity token was used. Live trace, screenshot, and video capture were disabled; backend debug logging was disabled and token-bearing DTOs redact their `toString()`.

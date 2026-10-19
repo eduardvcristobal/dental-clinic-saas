@@ -1,6 +1,6 @@
 M2.5 hosted CI evidence: BLOCKED
-Date checked: 2026-10-19
+Date checked: 2026-10-20
 Command: gh auth status — GitHub CLI reported the stored eduardvcristobal credential is invalid and recommended reauthentication.
 Command: gh run list --limit 5 — GitHub API connection failed.
-No workflow run was triggered or retrieved for the final M2.5 source commit. No run ID, commit SHA, individual hosted job conclusions, or hosted artifacts are claimed.
-Required next step: reauthenticate gh in the user's Mac terminal, then run/retrieve the workflow on the final source commit and append actual evidence.
+No workflow run was triggered or retrieved for the current local M2.5 source. No run ID, commit SHA, individual hosted job conclusions, or hosted artifacts are claimed. The scanner workflow update and NVD API key remain local; no GitHub Actions secret or repository variable was changed.
+To unblock hosted CI, reauthenticate `gh`, publish the current local commit, configure repository secret `NVD_API_KEY` and repository variable `RUN_OWASP_SCAN=true`, then run/retrieve the workflow and record its actual run ID, SHA, job conclusions, and artifacts.

@@ -7,6 +7,8 @@
 
 **PASS:** 53 tests, 0 failures, 0 errors, 0 skipped. Maven clean verification and packaged JAR succeeded.
 
+**2026-10-20 rerun:** `mvn -B -ntp verify` also passed 53/53 tests on OpenJDK 17.0.20 with three newly created, isolated PostgreSQL databases for authenticated integration, fresh V1–V15/RLS migration, and V14→V15 upgrade coverage. PostgreSQL 18.6 emitted Flyway's existing notice that its tested maximum is PostgreSQL 16; migrations and assertions passed. The fresh rerun databases contain synthetic test data only.
+
 - Auth security unit tests: 5 passed, including redaction of identity/access/refresh tokens from DTO `toString()`.
 - Authenticated HTTP integration: 14 passed, including a check that Spring MVC request/response body and request-parameter loggers are not debug-enabled. It also covers Google test-key signature/issuer/audience/expiry checks, active membership, refresh/replay, clinic registration, invitation flows, concurrent invitation claims, and patient-management HTTP coverage.
 - Auth rate limit: 2 passed.

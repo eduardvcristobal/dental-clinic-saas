@@ -136,8 +136,9 @@ jobs:
       - name: OWASP dependency-check (backend)
         working-directory: backend
         run: >
-          mvn -B -ntp org.owasp:dependency-check-maven:12.1.0:check
+          mvn -B -ntp org.owasp:dependency-check-maven:12.1.6:check
           -DfailBuildOnCVSS=7 -DfailOnError=true -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+          -DconnectionTimeout=10000 -DreadTimeout=60000 -DnvdMaxRetryCount=5
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       - uses: actions/upload-artifact@v4
