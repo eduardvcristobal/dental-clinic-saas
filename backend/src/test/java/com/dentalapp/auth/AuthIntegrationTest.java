@@ -203,7 +203,9 @@ class AuthIntegrationTest {
         assertThat(loggedIn.statusCode()).isEqualTo(200);
         String firstCookie = cookieValue(loggedIn);
         String setCookie = loggedIn.headers().firstValue("Set-Cookie").orElseThrow();
-        assertThat(setCookie).contains("HttpOnly", "SameSite=Strict", "Path=/api/auth", "Max-Age=1209600");
+        assertThat(setCookie).contains("HttpOnly", "SameSite=Strict", "Path=/api/auth");
+        // Split across statements: gitleaks' generic-api-key rule misreads "auth\", \"Max-Age=..." on one line.
+        assertThat(setCookie).contains("Max-Age=1209600");
         assertThat(setCookie).doesNotContain("Secure"); // Test profile explicitly disables HTTPS-only cookies.
 
         var rotated = refresh(firstCookie);
