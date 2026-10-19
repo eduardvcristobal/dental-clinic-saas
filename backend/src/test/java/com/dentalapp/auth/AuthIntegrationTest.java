@@ -111,6 +111,9 @@ class AuthIntegrationTest {
     UUID activeUserId;
     UUID otherUserId;
     UUID otherPatientId;
+    UUID branchId;
+    UUID otherBranchId;
+    UUID dentistUserId;
     String otherSlug;
     String slug;
 
@@ -125,8 +128,11 @@ class AuthIntegrationTest {
         activeUserId = UUID.randomUUID();
         otherUserId = UUID.randomUUID();
         otherPatientId = UUID.randomUUID();
+        branchId = UUID.randomUUID();
+        otherBranchId = UUID.randomUUID();
+        dentistUserId = UUID.randomUUID();
         TenantContext.runAs(clinicId, () -> {
-            jdbc.update("INSERT INTO branch(id,clinic_id,name) VALUES (?,?,?)", UUID.randomUUID(), clinicId, "Synthetic Main Branch A");
+            jdbc.update("INSERT INTO branch(id,clinic_id,name) VALUES (?,?,?)", branchId, clinicId, "Synthetic Main Branch A");
             jdbc.update("""
             INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active)
             VALUES (?,?,?,?,?,'OWNER',true)
@@ -135,11 +141,13 @@ class AuthIntegrationTest {
             INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active)
             VALUES (?,?,?,?,?,'FRONT_DESK',false)
             """, UUID.randomUUID(), clinicId, "inactive-" + slug + "@test.invalid", "unused", "Inactive Staff");
+            jdbc.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VALUES (?,?,?,?,?,'DENTIST',true)",
+                    dentistUserId, clinicId, "dentist-" + slug + "@test.invalid", "unused", "Synthetic Dentist");
             jdbc.update("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (?,?,?,?,?)",
                     UUID.randomUUID(), clinicId, "A-" + slug, "Patient", "A");
         });
         TenantContext.runAs(otherClinicId, () -> {
-            jdbc.update("INSERT INTO branch(id,clinic_id,name) VALUES (?,?,?)", UUID.randomUUID(), otherClinicId, "Synthetic Main Branch B");
+            jdbc.update("INSERT INTO branch(id,clinic_id,name) VALUES (?,?,?)", otherBranchId, otherClinicId, "Synthetic Main Branch B");
             jdbc.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VALUES (?,?,?,?,?,'OWNER',true)",
                     otherUserId, otherClinicId, "other-" + otherSlug + "@test.invalid", "unused", "Other Staff");
             jdbc.update("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (?,?,?,?,?)",
@@ -180,6 +188,61 @@ class AuthIntegrationTest {
         assertThat(setCookie).isNotNull();
         String cookie = setCookie.split(";", 2)[0];
         return cookie.substring(cookie.indexOf('=') + 1);
+    }
+
+    @Test void invitationCreationValidatesPayloadDuplicatesAndTenantScope() throws Exception {
+        var ownerLogin = login(slug, validToken(email()), "http://localhost:5173");
+        assertThat(ownerLogin.statusCode()).isEqualTo(200);
+        String ownerAccess = objectMapper.readTree(ownerLogin.body()).get("accessToken").asText();
+        String invitee = "invitee-" + slug + "@test.invalid";
+        String validBody = objectMapper.writeValueAsString(java.util.Map.of(
+                "email", invitee, "role", "FRONT_DESK", "branchId", branchId));
+
+        var created = request("POST", "/api/onboarding/invitations", validBody,
+                null, "http://localhost:5173", "Bearer " + ownerAccess);
+        assertThat(created.statusCode()).isEqualTo(201);
+        var createdJson = objectMapper.readTree(created.body());
+        UUID invitationId = UUID.fromString(createdJson.get("id").asText());
+        assertThat(createdJson.get("token").asText()).isNotBlank();
+        TenantContext.runAs(clinicId, () -> {
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_invitation WHERE id=? AND clinic_id=? AND email=? AND role='FRONT_DESK' AND branch_id=?", Integer.class,
+                    invitationId, clinicId, invitee, branchId)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM clinic_admin_event WHERE clinic_id=? AND subject_id=?", Integer.class, clinicId, invitationId)).isEqualTo(1);
+        });
+
+        var duplicate = request("POST", "/api/onboarding/invitations", validBody,
+                null, "http://localhost:5173", "Bearer " + ownerAccess);
+        assertThat(duplicate.statusCode()).isEqualTo(409);
+        assertThat(objectMapper.readTree(duplicate.body()).get("detail").asText()).contains("active invitation");
+
+        var invalidRole = request("POST", "/api/onboarding/invitations", objectMapper.writeValueAsString(java.util.Map.of(
+                "email", "bad-role-" + slug + "@test.invalid", "role", "OWNER", "branchId", branchId)),
+                null, "http://localhost:5173", "Bearer " + ownerAccess);
+        assertThat(invalidRole.statusCode()).isEqualTo(400);
+        assertThat(objectMapper.readTree(invalidRole.body()).get("detail").asText()).contains("Choose Administrator");
+
+        var emptyRole = request("POST", "/api/onboarding/invitations", objectMapper.writeValueAsString(java.util.Map.of(
+                "email", "empty-role-" + slug + "@test.invalid", "role", "", "branchId", branchId)),
+                null, "http://localhost:5173", "Bearer " + ownerAccess);
+        assertThat(emptyRole.statusCode()).isEqualTo(400);
+        assertThat(objectMapper.readTree(emptyRole.body()).get("detail").asText()).contains("Choose a staff role");
+
+        var crossClinicBranch = request("POST", "/api/onboarding/invitations", objectMapper.writeValueAsString(java.util.Map.of(
+                "email", "cross-clinic-" + slug + "@test.invalid", "role", "DENTIST", "branchId", otherBranchId)),
+                null, "http://localhost:5173", "Bearer " + ownerAccess);
+        assertThat(crossClinicBranch.statusCode()).isEqualTo(400);
+        assertThat(objectMapper.readTree(crossClinicBranch.body()).get("detail").asText()).contains("active branch in your clinic");
+        TenantContext.runAs(clinicId, () -> assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM staff_invitation WHERE clinic_id=?", Integer.class, clinicId)).isEqualTo(1));
+        TenantContext.runAs(otherClinicId, () -> assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM staff_invitation WHERE clinic_id=?", Integer.class, otherClinicId)).isZero());
+
+        assertThat(request("POST", "/api/onboarding/invitations", validBody,
+                null, "http://localhost:5173", null).statusCode()).isEqualTo(401);
+        var dentistLogin = login(slug, validToken("dentist-" + slug + "@test.invalid"), "http://localhost:5173");
+        String dentistAccess = objectMapper.readTree(dentistLogin.body()).get("accessToken").asText();
+        assertThat(request("POST", "/api/onboarding/invitations", validBody,
+                null, "http://localhost:5173", "Bearer " + dentistAccess).statusCode()).isEqualTo(403);
     }
 
     @Test void googleIdentityMatrixAndClinicMembershipAreEnforced() throws Exception {
@@ -255,7 +318,7 @@ class AuthIntegrationTest {
         TenantContext.set(clinicId);
         try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement();
              var result = statement.executeQuery("SELECT count(*) FROM app_user")) {
-            result.next(); assertThat(result.getInt(1)).isEqualTo(2);
+            result.next(); assertThat(result.getInt(1)).isEqualTo(3);
         } finally { TenantContext.clear(); }
         try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement();
              var result = statement.executeQuery("SELECT count(*) FROM app_user")) {

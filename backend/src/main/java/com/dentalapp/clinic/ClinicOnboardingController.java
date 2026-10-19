@@ -91,12 +91,25 @@ public class ClinicOnboardingController {
     @PostMapping("/invitations") @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> invite(Authentication auth,@RequestBody Invite input) {
         AuthPrincipal user=manager(auth);
-        String invitedEmail=email(input.email()), role=required(input.role(),20);
-        if(!List.of("ADMIN","DENTIST","FRONT_DESK").contains(role)) throw bad("Invalid invite role");
-        if(input.branchId()==null) throw bad("Branch required");
+        if(input==null) throw bad("Invitation details are required.");
+        String invitedEmail=email(input.email());
+        if(!invitedEmail.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) throw bad("Enter a valid email address.");
+        String role=input.role()==null?"":input.role().strip();
+        if(role.isEmpty()) throw bad("Choose a staff role.");
+        if(!List.of("ADMIN","DENTIST","FRONT_DESK").contains(role)) throw bad("Choose Administrator, Dentist, or Front Desk.");
+        if(input.branchId()==null) throw bad("Choose a branch.");
         return tx.execute(status -> {
+            // Serialize invitation creation for this tenant so simultaneous duplicate submissions
+            // cannot race past the pending-invitation check. Tenant scope still comes only from auth.
+            if(db.queryForList("SELECT id FROM clinic WHERE id=? FOR UPDATE",user.clinicId()).isEmpty())
+                throw bad("Clinic is unavailable.");
             Integer active=db.queryForObject("SELECT count(*) FROM branch WHERE clinic_id=? AND id=? AND active=true",Integer.class,user.clinicId(),input.branchId());
-            if(active==null || active!=1) throw bad("Invalid branch");
+            if(active==null || active!=1) throw bad("Choose an active branch in your clinic.");
+            Integer duplicate=db.queryForObject("""
+                SELECT count(*) FROM staff_invitation
+                WHERE clinic_id=? AND lower(email)=? AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>now()
+                """,Integer.class,user.clinicId(),invitedEmail);
+            if(duplicate!=null && duplicate>0) throw new ResponseStatusException(HttpStatus.CONFLICT,"An active invitation already exists for this email.");
             byte[] bytes=new byte[32];random.nextBytes(bytes);
             String secret=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
             String token=user.clinicId()+"."+secret;

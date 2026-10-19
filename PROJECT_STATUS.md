@@ -4,7 +4,7 @@
 **Authoritative baseline:** M0.3 working repository plus M0.4 validation fixes
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M0.5–M0.7 prototypes implemented; M1.1–M1.4 implementation and local regression/database validation delivered; full M1 acceptance is still open; **not pilot-ready**.
+**Overall status:** M0.5–M0.7 prototypes implemented; M1.1–M1.4 implementation and local regression/database validation delivered; full M1 acceptance is still open pending live invitation replay evidence; **not pilot-ready**.
 
 ## Progress conventions
 
@@ -296,10 +296,18 @@ M1.4.2's recorded local suite totals remain 30 backend + 24 frontend + 3 browser
 
 See [M1.4.4 final acceptance report](docs/M1_4_4_FINAL_ACCEPTANCE_REPORT.md), [reconciled checklist](docs/M1_4_ACCEPTANCE_CHECKLIST.md), and [M1.4.3 evidence handoff](docs/M1_4_3_EXTERNAL_CERTIFICATION_REPORT.md).
 
-## M1.4.5 — Hosted CI evidence and live OAuth follow-up (2026-10-19)
+## M1.4.5 — Invitation fix and live E2E (2026-10-19)
 
 - [x] Confirmed the previously disputed hosted run `39232339581` in the signed-in GitHub web session: overall success on `main`, SHA `2791a1c578f19174ea609b53ad84ed656fc9faf9`; Java/PostgreSQL, frontend, browser and security jobs succeeded; optional OWASP was skipped. Backend 30 tests and frontend 24 tests passed; browser E2E succeeded with synthetic Google credentials. Gitleaks found no leaks. Dependency Review did not execute on this push event because it is PR-only.
 - [x] Saved job conclusions and artifact digests in `docs/M1_4_HOSTED_CI_EVIDENCE.md`; updated the M1 acceptance checklist and M1.4.4 reconciliation report.
-- [ ] Actual Google OAuth and invitation acceptance remain unverified. The owner completed the sign-in handoff and clarified the invitee address as `smitycristobal@gmail.com`, but there is no authenticated app state and the local app ports were unreachable at follow-up. No invitation was issued; no token or password was logged or saved.
+- [x] Root cause of the HTTP 400 was an empty `role` in the authenticated invitation request (`Invite[email=smitycristobal@gmail.com, role=, branchId=<valid UUID>]`). The owner and active branch were valid. Backend validation rejected the role before database writes, but returned only generic “Bad Request”; the UI did not prevent submitting an empty role. Added explicit backend role/email/branch validation, safe actionable API problem details, duplicate-pending 409 handling serialized on the clinic row, and a required role selection in the UI. The tenant always comes from the authenticated principal.
+- [x] Added regression coverage for valid invitation creation, invalid role, invalid/cross-clinic branch, duplicate invitation, unauthenticated access, and authenticated unauthorized user. Existing HTTP integration tests cover acceptance, replay, expiry, revocation and concurrent acceptance.
+- [x] Live owner created a `FRONT_DESK` invitation for `smitycristobal@gmail.com` on `Main Test Branch` in isolated clinic `m1-oauth-acceptance-2026`. Recipient completed real Google verification, accepted the invitation, and signed in through Google. The live app displayed the `Reception / Front Desk` workspace and only Front Desk permitted navigation. A read-only database check confirmed an active membership, correct branch assignment, unrevoked/unexpired accepted invitation, and exactly one invitation-created and one invitation-accepted audit event. Credentials and identity tokens were not saved or logged.
+- [ ] Live replay of the same consumed invitation link remains unverified. The app cleared the one-time bearer token from the URL and component state after acceptance; we did not retain or extract that secret to force a second submission. Automated replay rejection passed in the isolated HTTP regression suite.
+- [x] Java 17 Maven `clean verify`: 31 tests passed; PostgreSQL V1–V14 migrations and restricted-role RLS included. Frontend Oxlint passed; Vitest 25/25; TypeScript/Vite production build passed. Playwright 4/4 passed. Total: **60 passed, 0 failed, 0 skipped, 0 blocked**.
+- [x] Reproduced hosted CI evidence remains run `39232339581`, SHA `2791a1c578f19174ea609b53ad84ed656fc9faf9`; `java17`, `frontend`, `browser`, and `security` succeeded, optional `owasp` skipped. This hosted run is historical and is not a verification of the current M1.4.5 commit.
+- [ ] Maven NVD scan: **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10. Dependency risk remains unassessed. A completed Maven vulnerability assessment and disposition of findings is mandatory before production deployment.
 
-M1 remains open, M2 has not started, and the product is not production-ready. The M10 Maven vulnerability assessment remains required before production deployment.
+M1 remains open pending live replay evidence, M2 has not started, and the product is not production-ready. No real patient records were activated. The M10 Maven vulnerability assessment remains required before production deployment.
+
+See [M1.4.5 final certification report](docs/M1_4_5_FINAL_CERTIFICATION_REPORT.md) and the [M1 final acceptance checklist](docs/M1_4_ACCEPTANCE_CHECKLIST.md).

@@ -47,7 +47,9 @@ async function parseError(res: Response): Promise<ApiError> {
   let message = res.statusText || 'Request failed'
   try {
     const body = await res.json()
-    if (typeof body?.message === 'string') message = body.message
+    if (typeof body?.detail === 'string') message = body.detail
+    else if (typeof body?.message === 'string') message = body.message
+    else if (typeof body?.error === 'string') message = body.error
   } catch {
     /* non-JSON body */
   }

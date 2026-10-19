@@ -53,4 +53,13 @@ describe('session API client', () => {
     await expect(api('/api/private')).rejects.toMatchObject({ status: 401 })
     expect(expired).toHaveBeenCalledOnce()
   })
+
+  it('surfaces safe problem details returned for a validation error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      type: 'about:blank', title: 'Bad Request', status: 400, detail: 'Choose a staff role.',
+    }), { status: 400, headers: { 'Content-Type': 'application/problem+json' } })))
+
+    await expect(api('/api/onboarding/invitations', { method: 'POST', body: '{}' }))
+      .rejects.toMatchObject({ status: 400, message: 'Choose a staff role.' })
+  })
 })

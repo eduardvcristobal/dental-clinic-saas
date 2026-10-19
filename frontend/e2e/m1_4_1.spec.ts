@@ -218,3 +218,36 @@ test('Google Identity initializes once while navigating between login screens', 
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible()
   expect(await page.evaluate(() => (window as unknown as { __gsiInitCount?: number }).__gsiInitCount)).toBe(1)
 })
+
+test('owner invitation form submits a valid selected role and active branch', async ({ page }) => {
+  await installApiFixtures(page)
+  await installGoogleScriptDouble(page)
+  let submitted: Record<string, unknown> | null = null
+  await page.route('**/api/onboarding/invitations', async (route) => {
+    if (route.request().method() === 'POST') {
+      submitted = route.request().postDataJSON()
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({
+        id: '44444444-4444-4444-8444-444444444444', token: 'synthetic-invitation-token', expiresAt: '2030-01-01T00:00:00Z',
+      }) })
+    } else {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    }
+  })
+
+  await page.goto('/login')
+  await page.getByLabel('Clinic code').fill(clinic.slug)
+  await page.evaluate(() => { (window as unknown as { __gsiCredential?: string }).__gsiCredential = 'synthetic-id-token:OWNER' })
+  await page.getByRole('button', { name: 'Sign in with Google' }).click()
+  await expect(page).toHaveURL(/\/workspace\//)
+  await page.goto('/workspace/staff')
+  await page.getByLabel('Email').fill('staff@test.invalid')
+  const roleSelect = page.locator('label').filter({ hasText: /^Role/ }).locator('select')
+  await roleSelect.selectOption('FRONT_DESK')
+  await expect(roleSelect).toHaveValue('FRONT_DESK')
+  await page.getByRole('button', { name: 'Create invitation' }).click()
+  await expect(page.getByText('One-time invitation created')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Copy private link' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open acceptance page' })).toBeVisible()
+  await expect(page.getByLabel('One-time invitation token')).toHaveCount(0)
+  expect(submitted).toEqual({ email: 'staff@test.invalid', role: 'FRONT_DESK', branchId: branch.id })
+})

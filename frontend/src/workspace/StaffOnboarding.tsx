@@ -5,6 +5,8 @@ type Branch = { id: string; name: string; active: boolean }
 type Staff = { id: string; full_name: string; email: string; role: string; active: boolean }
 type Invitation = { id: string; email: string; role: string; branch_id: string; expires_at: string; accepted_at: string | null; revoked_at: string | null; status: 'Accepted' | 'Revoked' | 'Expired' | 'Pending' }
 type Dentist = { id: string; user_id: string; full_name: string; license_no: string; specialty: string; active: boolean }
+type InviteRole = 'DENTIST' | 'FRONT_DESK' | 'ADMIN'
+const INVITE_ROLES: InviteRole[] = ['DENTIST', 'FRONT_DESK', 'ADMIN']
 const json = (data: unknown) => ({ method: 'POST', body: JSON.stringify(data) })
 export function StaffOnboarding() {
  const [branches, setBranches] = useState<Branch[]>([])
@@ -54,11 +56,11 @@ export function StaffOnboarding() {
    const result = await api<{token:string}>('/api/onboarding/invitations', json({email,role,branchId:branch})); setToken(result.token); setEmail('')
   }, 'One-time invitation created') }}>
    <label>Email<input type="email" required value={email} maxLength={254} onChange={e=>setEmail(e.target.value)} /></label>
-   <label>Role<select value={role} onChange={e=>setRole(e.target.value)}><option value="DENTIST">Dentist</option><option value="FRONT_DESK">Front Desk</option><option value="ADMIN">Administrator</option></select></label>
+   <label>Role<select required value={role} onChange={e=>{const value=e.target.value;if(INVITE_ROLES.includes(value as InviteRole))setRole(value as InviteRole)}}><option value="DENTIST">Dentist</option><option value="FRONT_DESK">Front Desk</option><option value="ADMIN">Administrator</option></select></label>
    <label>Branch<select required value={branch} onChange={e=>setBranch(e.target.value)}>{branches.filter(x=>x.active).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
    <button disabled={busy || !branch}>Create invitation</button>
   </form>
-  {token && <div className="ws-panel"><strong>Copy this token now</strong><p className="ws-subtle">It will not be displayed again. Send the recipient the private acceptance link. Google must verify the matching email. Treat the token as a credential.</p><textarea readOnly aria-label="One-time invitation token" value={`${window.location.origin}/accept-invitation?token=${encodeURIComponent(token)}`} rows={3}/><button type="button" onClick={() => {void navigator.clipboard.writeText(`${window.location.origin}/accept-invitation?token=${encodeURIComponent(token)}`)}}>Copy token</button><button type="button" onClick={()=>setToken('')}>Dismiss</button></div>}
+  {token && <div className="ws-panel"><strong>Invitation link created</strong><p className="ws-subtle">Share the private link with the invited person, or open it here to complete acceptance. Google must verify the matching email. Treat the link as a credential.</p><button type="button" onClick={() => {void navigator.clipboard.writeText(`${window.location.origin}/accept-invitation?token=${encodeURIComponent(token)}`)}}>Copy private link</button><button type="button" onClick={()=>{window.location.assign(`/accept-invitation?token=${encodeURIComponent(token)}`)}}>Open acceptance page</button><button type="button" onClick={()=>setToken('')}>Dismiss</button></div>}
   <h3>Recent invitations</h3>{invites.map(i=><div className="ws-management-row" key={i.id}><span>{i.email} · {i.role}</span><span>{i.status}</span>{!i.accepted_at&&!i.revoked_at&&i.status!=='Expired'&&<button disabled={busy} onClick={()=>void run(()=>api(`/api/onboarding/invitations/${i.id}/revoke`,{method:'POST'}),'Invitation revoked')}>Revoke</button>}</div>)}
   <h3>Dentist profiles</h3><p className="ws-subtle">Link a professional profile only to an existing active Dentist staff account in this clinic.</p>
   <form onSubmit={e=>{e.preventDefault();void run(async()=>{await api('/api/onboarding/dentists',json({userId:staffId,fullName:name,licenseNo:license,specialty}));setName('');setLicense('');setSpecialty('')},'Dentist profile created')}}>
