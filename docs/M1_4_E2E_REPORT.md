@@ -19,3 +19,7 @@ A browser screenshot was inspected in-session but could not be saved as a file b
 ## Result
 
 The UI route and disabled registration boundary received a limited smoke check. M1.4 onboarding E2E acceptance remains blocked; this report does not certify the full workflow.
+
+## Browser console observation
+
+During this development-server smoke, Vite emitted repeated Google Identity Services warnings that `google.accounts.id.initialize()` was called multiple times. This was not investigated against a production build or a completed sign-in, so it is recorded as an unresolved frontend follow-up rather than a confirmed authentication failure.
