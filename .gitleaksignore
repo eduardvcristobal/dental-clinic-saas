@@ -1,0 +1,2 @@
+# False positive: the test asserts the literal HttpOnly cookie attribute, not a credential.
+08a9935989aa49551836ad453c5d547129d3ad50:backend/src/test/java/com/dentalapp/auth/AuthIntegrationTest.java:generic-api-key:201

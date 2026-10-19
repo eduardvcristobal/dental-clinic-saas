@@ -24,7 +24,7 @@ Hosted automated totals for both successful runs: **62 passed, 0 failed, 0 skipp
 
 The first current-source run, [`39249506226`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39249506226), ran on `982e436421d94a0b2aad76fa15eacaa6b79e466e`. Its Java, frontend, and browser jobs passed, but the security job failed because Gitleaks tried to scan the pushed commit range while the default shallow checkout did not contain the referenced parent commit. Its log said the revision was unknown and the repository scan failed; this was not a secret finding.
 
-The smallest fix sets `fetch-depth: 0` only for the security job checkout, allowing Gitleaks to inspect the intended range. The rerun on `d9e230f` completed successfully and explicitly reported no leaks. A final run on `0205a94` then passed all jobs again after the documentation update. No tests, dependency reviews, or secret scanning were disabled.
+The smallest fix sets `fetch-depth: 0` only for the security job checkout, allowing Gitleaks to inspect the intended range. The rerun on `d9e230f` completed successfully and explicitly reported no leaks. A final run on `0205a94` then passed all jobs again after the documentation update. A separate full-history scan of all 33 repository commits found one exact false positive in the historical test assertion for the `HttpOnly` cookie attribute. `.gitleaksignore` now suppresses only that fingerprint (`08a9935…`, test file line 201); rerunning the full-history scan reported zero findings. All other secret rules remain enabled. No tests, dependency reviews, or secret scanning were disabled.
 
 ## Scope and remaining gates
 
