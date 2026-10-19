@@ -19,3 +19,5 @@ describe('clinic workspace module visibility', () => {
     expect(WORKSPACE_MODULES.find(m => m.id === 'patient-360')?.state).toBe('preview')
   })
 })
+
+describe('M2.1 patient registry activation', () => { it('makes the registry active while patient 360 remains a preview', () => { expect(WORKSPACE_MODULES.find(m=>m.id==='patients')?.state).toBe('active');expect(WORKSPACE_MODULES.find(m=>m.id==='patient-360')?.state).toBe('preview') }) })

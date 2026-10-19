@@ -1,3 +1,12 @@
+## M2.1 — Patient Registry, Demographics & Search (implementation; validation pending)
+- [x] Tenant-scoped patient CRUD API and archive endpoint.
+- [x] Search by chart number, name, phone; bounded pagination.
+- [x] Patient registration/editing interface; duplicate candidate pre-check.
+- [x] Clinic-local chart numbering and audit events.
+- [ ] Java 17 backend build and full regression on PostgreSQL.
+- [ ] Two-clinic CRUD/RLS integration and browser E2E validation.
+- [ ] Production data/privacy approval (not authorized).
+
 # Dental Clinic SaaS — Project Status
 
 **Last updated:** 2026-10-19  

@@ -8,7 +8,7 @@ export const WORKSPACE_MODULES: WorkspaceModule[] = [
   { id: 'command-center', title: 'Command Center', group: 'Workspace', description: 'A role-specific view of the working day', state: 'preview', roles: ALL },
   { id: 'journey', title: 'Patient Journey', group: 'Workspace', description: 'End-to-end workflow design simulation', state: 'preview', roles: ALL },
   { id: 'calendar', title: 'Calendar', group: 'Workspace', description: 'Dentist and chair scheduling', state: 'preview', roles: ALL },
-  { id: 'patients', title: 'Patients', group: 'Workspace', description: 'Patient directory and search', state: 'preview', roles: ALL },
+  { id: 'patients', title: 'Patients', group: 'Workspace', description: 'Patient registration, demographic records and search', state: 'active', roles: ALL },
   { id: 'check-in', title: 'Check-in', group: 'Workspace', description: 'Arrivals and waiting room', state: 'coming-soon', roles: ALL },
   { id: 'patient-360', title: 'Patient 360°', group: 'Clinical', description: 'Unified dental patient record', state: 'preview', roles: ALL },
   { id: 'odontogram', title: 'Odontogram', group: 'Clinical', description: 'Tooth and surface history', state: 'coming-soon', roles: CLINICAL },
