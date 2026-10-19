@@ -23,7 +23,7 @@ Self-registration was enabled only in the temporary backend process used for tes
 | Backend and PostgreSQL regression | PASS | Java 17.0.20 Maven `clean verify`: 33 tests, 0 failures/errors/skips; fresh PostgreSQL 18.6 auth/migration DBs; V1–V14 and RLS gates |
 | Frontend regression | PASS | Node 24.18.0, npm 11.16.0; Oxlint; Vitest 25/25; TypeScript/Vite production build |
 | Browser regression | PASS | Playwright 4/4 passed, including role/branch form payload and responsive route checks |
-| Hosted CI | PASS | Run [`39249898417`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39249898417), SHA `d9e230fc09fff40a3d11c9315361f86f058555bd`: `java17`, `frontend`, `browser`, and `security` succeeded; `owasp` skipped by accepted deferral. Hosted test total: 62 passed, 0 failed/skipped/blocked. |
+| Hosted CI | PASS | Latest run [`39250767984`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39250767984), SHA `d705257ca701c7c10e12ab5d279acde5631ea6af`: `java17`, `frontend`, `browser`, and `security` succeeded; `owasp` skipped by accepted deferral. Hosted test total: 62 passed, 0 failed/skipped/blocked. |
 
 Total local automated checks: **62 passed, 0 failed, 0 skipped, 0 blocked** (33 backend + 25 frontend + 4 Playwright). Live manual E2E observations are documented separately and are not included in these test totals.
 
@@ -33,7 +33,7 @@ Total local automated checks: **62 passed, 0 failed, 0 skipped, 0 blocked** (33 
 
 ## Hosted workflow status
 
-Hosted run `39249898417` passed on SHA `d9e230fc09fff40a3d11c9315361f86f058555bd`. An initial run failed because the Gitleaks action lacked the parent commit in a shallow checkout; full history was enabled for that job and the rerun passed with no leaks detected. Dependency Review remains configured for pull requests and did not run on this push. OWASP remains skipped under its accepted deferral. See [hosted CI evidence](M1_4_6_HOSTED_CI_EVIDENCE.md).
+Latest hosted run `39250767984` passed on SHA `d705257ca701c7c10e12ab5d279acde5631ea6af`. An initial run failed because the Gitleaks action lacked the parent commit in a shallow checkout; full history was enabled for that job and the rerun passed with no leaks detected. Dependency Review remains configured for pull requests and did not run on this push. OWASP remains skipped under its accepted deferral. See [hosted CI evidence](M1_4_6_HOSTED_CI_EVIDENCE.md).
 
 ## Security and production status
 

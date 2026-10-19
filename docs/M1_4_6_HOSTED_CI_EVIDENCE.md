@@ -1,14 +1,14 @@
 # M1.4.6 — Hosted GitHub Actions Evidence
 
-**Status: PASS for development acceptance.** Latest hosted workflow run [`39250308698`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39250308698) completed successfully on commit `0205a94caf2c929381c6d3690ee447ead3bafeaf` on 2026-10-19. The code/workflow acceptance commit `d9e230fc09fff40a3d11c9315361f86f058555bd` also passed in run [`39249898417`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39249898417); the latest run includes only the reconciled acceptance documentation changes after that source/workflow commit.
+**Status: PASS for development acceptance.** Latest hosted workflow run [`39250767984`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39250767984) completed successfully on commit `d705257ca701c7c10e12ab5d279acde5631ea6af` on 2026-10-19. All required jobs passed on this final source/configuration commit.
 
 ## Run record
 
 - Event: push to `m1.4.6-acceptance`
-- Latest commit SHA: `0205a94caf2c929381c6d3690ee447ead3bafeaf`
+- Latest commit SHA: `d705257ca701c7c10e12ab5d279acde5631ea6af`
 - Latest run overall conclusion: `success`
-- Code/workflow fix commit SHA: `d9e230fc09fff40a3d11c9315361f86f058555bd` (also passed all required jobs)
-- Workflow: [Java 17, PostgreSQL, frontend, browser, security](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39249898417)
+- Final workflow run: [`39250767984`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39250767984)
+- Workflow: [Java 17, PostgreSQL, frontend, browser, security](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39250767984)
 
 | Job | Conclusion | Actual evidence |
 |---|---|---|
@@ -18,13 +18,13 @@
 | `security` | **success** | Gitleaks reported **No leaks detected**. Dependency Review did not run because this was a push event; the PR-only step remains enabled in the workflow. |
 | `owasp` | **skipped** | **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10. This is not a PASS. Complete Maven vulnerability assessment before production deployment. |
 
-Hosted automated totals for both successful runs: **62 passed, 0 failed, 0 skipped test cases, 0 blocked** (33 backend + 25 frontend + 4 Playwright). The optional OWASP job is a skipped workflow job and is reported separately; it is not counted as a test case.
+Latest hosted automated totals: **62 passed, 0 failed, 0 skipped test cases, 0 blocked** (33 backend + 25 frontend + 4 Playwright). The optional OWASP job is a skipped workflow job and is reported separately; it is not counted as a test case.
 
 ## Failure investigation and correction
 
 The first current-source run, [`39249506226`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39249506226), ran on `982e436421d94a0b2aad76fa15eacaa6b79e466e`. Its Java, frontend, and browser jobs passed, but the security job failed because Gitleaks tried to scan the pushed commit range while the default shallow checkout did not contain the referenced parent commit. Its log said the revision was unknown and the repository scan failed; this was not a secret finding.
 
-The smallest fix sets `fetch-depth: 0` only for the security job checkout, allowing Gitleaks to inspect the intended range. The rerun on `d9e230f` completed successfully and explicitly reported no leaks. A final run on `0205a94` then passed all jobs again after the documentation update. A separate full-history scan of all 33 repository commits found one exact false positive in the historical test assertion for the `HttpOnly` cookie attribute. `.gitleaksignore` now suppresses only that fingerprint (`08a9935…`, test file line 201); rerunning the full-history scan reported zero findings. All other secret rules remain enabled. No tests, dependency reviews, or secret scanning were disabled.
+The smallest fix sets `fetch-depth: 0` only for the security job checkout, allowing Gitleaks to inspect the intended range. The rerun on `d9e230f` completed successfully and explicitly reported no leaks. Follow-up runs on `0205a94` and `d705257ca701c7c10e12ab5d279acde5631ea6af` passed all jobs; the latest Gitleaks job also reported no leaks. A separate full-history scan of all 33 repository commits found one exact false positive in the historical test assertion for the `HttpOnly` cookie attribute. `.gitleaksignore` now suppresses only that fingerprint (`08a9935…`, test file line 201); rerunning the full-history scan reported zero findings. All other secret rules remain enabled. No tests, dependency reviews, or secret scanning were disabled.
 
 ## Scope and remaining gates
 
