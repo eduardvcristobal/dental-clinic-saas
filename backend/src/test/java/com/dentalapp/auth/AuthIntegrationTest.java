@@ -386,6 +386,55 @@ class AuthIntegrationTest {
                 "SELECT count(*) FROM dentist WHERE user_id=? AND clinic_id=?", Integer.class, staffId, createdClinic)).isEqualTo(1));
     }
 
+    @Test void clinicRegistrationRejectsInvalidDuplicateAndUnverifiedAttemptsSafely() throws Exception {
+        String clinicSlug = "registration-" + UUID.randomUUID().toString().substring(0, 8);
+        var validBody = java.util.Map.of(
+                "googleIdToken", validToken("registration-owner-" + UUID.randomUUID() + "@test.invalid"),
+                "slug", clinicSlug, "name", "Registration Test Clinic", "timezone", "Asia/Manila",
+                "branchName", "Main Branch", "ownerName", "Test Owner");
+        var created = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(validBody),
+                null, "http://localhost:5173", null);
+        assertThat(created.statusCode()).isEqualTo(201);
+        UUID clinicId = UUID.fromString(objectMapper.readTree(created.body()).get("clinicId").asText());
+
+        var duplicate = new java.util.HashMap<>(validBody);
+        duplicate.put("googleIdToken", validToken("second-owner-" + UUID.randomUUID() + "@test.invalid"));
+        var duplicateResponse = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(duplicate),
+                null, "http://localhost:5173", null);
+        assertThat(duplicateResponse.statusCode()).isEqualTo(409);
+        assertThat(objectMapper.readTree(duplicateResponse.body()).get("detail").asText()).contains("clinic code is already in use");
+
+        var invalidSlug = new java.util.HashMap<>(validBody);
+        invalidSlug.put("slug", "BAD_SLUG");
+        var invalidSlugResponse = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(invalidSlug),
+                null, "http://localhost:5173", null);
+        assertThat(invalidSlugResponse.statusCode()).isEqualTo(400);
+        assertThat(objectMapper.readTree(invalidSlugResponse.body()).get("detail").asText()).contains("Invalid clinic slug");
+
+        var invalidZone = new java.util.HashMap<>(validBody);
+        invalidZone.put("slug", "timezone-" + UUID.randomUUID().toString().substring(0, 8));
+        invalidZone.put("timezone", "Mars/Olympus");
+        var invalidZoneResponse = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(invalidZone),
+                null, "http://localhost:5173", null);
+        assertThat(invalidZoneResponse.statusCode()).isEqualTo(400);
+
+        var unverified = new java.util.HashMap<>(validBody);
+        unverified.put("slug", "unverified-" + UUID.randomUUID().toString().substring(0, 8));
+        unverified.put("googleIdToken", "not-a-google-token");
+        var unverifiedResponse = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(unverified),
+                null, "http://localhost:5173", null);
+        assertThat(unverifiedResponse.statusCode()).isEqualTo(401);
+
+        var unauthorizedOrigin = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(validBody),
+                null, "https://attacker.invalid", null);
+        assertThat(unauthorizedOrigin.statusCode()).isEqualTo(403);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM clinic WHERE slug LIKE 'registration-%'", Integer.class)).isEqualTo(1);
+        TenantContext.runAs(clinicId, () -> {
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM branch WHERE clinic_id=?", Integer.class, clinicId)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE clinic_id=? AND role='OWNER'", Integer.class, clinicId)).isEqualTo(1);
+        });
+    }
+
     @Test void revokedAndExpiredInvitationsCannotBeAccepted() throws Exception {
         String ownerAccess = objectMapper.readTree(login(slug, validToken(email()), "http://localhost:5173").body()).get("accessToken").asText();
         UUID branch = TenantContext.callAs(clinicId, () -> jdbc.queryForObject("SELECT id FROM branch WHERE clinic_id=? LIMIT 1", UUID.class, clinicId));

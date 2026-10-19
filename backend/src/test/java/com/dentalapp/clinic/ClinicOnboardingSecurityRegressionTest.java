@@ -36,6 +36,16 @@ class ClinicOnboardingSecurityRegressionTest {
         verifyNoInteractions(google, db);
     }
 
+    @Test void publicClinicRegistrationIsDisabledUnlessExplicitlyEnabled() {
+        var disabled = new ClinicOnboardingController(db, google, manager, false, "http://localhost:5173");
+        var request = new MockHttpServletRequest();
+        request.addHeader("Origin", "http://localhost:5173");
+        var error = assertThrows(ResponseStatusException.class, () -> disabled.create(
+                new ClinicOnboardingController.CreateClinic("fake", "example", "Clinic", "Asia/Manila", "Main", "Owner"), request));
+        assertEquals(403, error.getStatusCode().value());
+        verifyNoInteractions(google, db);
+    }
+
     @Test void staffCannotCreateAnotherOwnerOrInviteToInvalidRole() {
         var auth = new UsernamePasswordAuthenticationToken(
                 new AuthPrincipal(UUID.randomUUID(), UUID.randomUUID(), "OWNER"), "", List.of());

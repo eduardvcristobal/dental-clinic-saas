@@ -17,6 +17,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -78,15 +79,20 @@ public class ClinicOnboardingController {
         try {ZoneId.of(timezone);} catch(Exception e){throw bad("Invalid timezone");}
         String clinicName=required(input.name(),160), branchName=required(input.branchName(),160), ownerName=required(input.ownerName(),160);
         UUID clinic=UUID.randomUUID(), branch=UUID.randomUUID(), owner=UUID.randomUUID();
-        return TenantContext.callAs(clinic, () -> tx.execute(status -> {
-            // The clinic root is deliberately not RLS-protected, but its child records are.
-            db.update("INSERT INTO clinic(id,slug,name,timezone,email) VALUES(?,?,?,?,?)",clinic,slug,clinicName,timezone,verified);
-            db.update("INSERT INTO branch(id,clinic_id,name) VALUES(?,?,?)",branch,clinic,branchName);
-            db.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role) VALUES(?,?,?,'',?,'OWNER')",owner,clinic,verified,ownerName);
-            db.update("INSERT INTO user_branch(clinic_id,user_id,branch_id) VALUES(?,?,?)",clinic,owner,branch);
-            event(clinic,owner,"CLINIC_CREATED",clinic,"Initial clinic and owner provisioned");
-            return Map.<String,Object>of("clinicId",clinic,"clinicSlug",slug,"branchId",branch,"ownerId",owner);
-        }));
+        try {
+            return TenantContext.callAs(clinic, () -> tx.execute(status -> {
+                // The clinic root is deliberately not RLS-protected, but its child records are.
+                db.update("INSERT INTO clinic(id,slug,name,timezone,email) VALUES(?,?,?,?,?)",clinic,slug,clinicName,timezone,verified);
+                db.update("INSERT INTO branch(id,clinic_id,name) VALUES(?,?,?)",branch,clinic,branchName);
+                db.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role) VALUES(?,?,?,'',?,'OWNER')",owner,clinic,verified,ownerName);
+                db.update("INSERT INTO user_branch(clinic_id,user_id,branch_id) VALUES(?,?,?)",clinic,owner,branch);
+                event(clinic,owner,"CLINIC_CREATED",clinic,"Initial clinic and owner provisioned");
+                return Map.<String,Object>of("clinicId",clinic,"clinicSlug",slug,"branchId",branch,"ownerId",owner);
+            }));
+        } catch (DuplicateKeyException duplicate) {
+            // The unique clinic-code constraint is the final authority in a concurrent race.
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"That clinic code is already in use.");
+        }
     }
     @PostMapping("/invitations") @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> invite(Authentication auth,@RequestBody Invite input) {
