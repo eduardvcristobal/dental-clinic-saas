@@ -267,3 +267,16 @@ See the detailed certification, browser and security results in `docs/M1_4_1_FIN
 M1.4.2 totals: **57 passed, 0 failed, 0 skipped** (30 backend + 24 frontend + 3 browser). **Still-open gates: live Google sign-in, OWASP NVD scan, hosted CI. Do not start M2 or use real patient data.**
 
 See the detailed certification, browser and security results in `docs/M1_4_1_FINAL_CERTIFICATION_REPORT.md`, `docs/M1_4_1_E2E_RESULTS.md`, and `docs/M1_4_1_SECURITY_RESULTS.md`.
+
+## M1.4.3 — External integration certification handoff (2026-10-19)
+
+**Status: BLOCKED / NOT CERTIFIED. M1 OPEN; M2 and real patient data remain blocked.**
+
+- [x] Reviewed M1.4.2 external certification prerequisites and added read-only preflight script.
+- [x] Hardened optional GitHub Actions OWASP scan to fail closed on missing NVD key or scanner errors, with CVSS >= 7 failure threshold.
+- [ ] Actual live Google OAuth sign-in and invitation-acceptance evidence (requires authorized OAuth client and test identities).
+- [ ] Current completed Maven OWASP advisory scan (requires NVD access/key).
+- [ ] Hosted CI success evidence (requires authorized Git remote and Actions run).
+- [ ] Independent Java 17/PostgreSQL/full end-to-end certification, final acceptance signoff and M1 closure.
+
+See `docs/M1_4_3_EXTERNAL_CERTIFICATION_REPORT.md`. Previous M1.4.2 reports recorded 57 passing tests; **none were rerun in this handoff**.

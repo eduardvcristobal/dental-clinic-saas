@@ -121,11 +121,19 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+      - name: Require NVD API key for certification scan
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo 'NVD_API_KEY secret is missing; cannot certify Maven dependency advisories.' >&2
+            exit 1
+          fi
       - name: OWASP dependency-check (backend)
         working-directory: backend
         run: >
           mvn -B -ntp org.owasp:dependency-check-maven:12.1.0:check
-          -DfailBuildOnCVSS=9 -DfailOnError=false
+          -DfailBuildOnCVSS=7 -DfailOnError=true -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
       - uses: actions/upload-artifact@v4
