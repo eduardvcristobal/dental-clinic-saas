@@ -42,9 +42,9 @@ This item is closed as hosted CI evidence. The independent local GitHub CLI cred
 
 ## Live Google sign-in and invitation acceptance
 
-**Status: BLOCKED — live OAuth and invitation acceptance remain unverified.** The owner supplied separate clinic OWNER and invitation recipient identities, completed the requested owner sign-in handoff, and clarified the invitee as `smitycristobal@gmail.com`. A disposable database, `dental_m144_oauth`, had migrations V1–V14 completed and the app previously started on Java 17 with a non-superuser/non-BYPASSRLS app role. Local-only OAuth settings are ignored by Git. At follow-up, the current Chrome session was not on the app and local ports 5173/8080 were unreachable; there was no authenticated app state to verify. No invitation was issued. No identity token or password was logged or saved.
+**Status: PARTIAL — owner’s live Google OAuth verified; invitation acceptance blocked.** In the isolated database `dental_m144_oauth`, migrations V1–V14 were applied and the app ran on Java 17 with a non-superuser/non-BYPASSRLS app role. The owner completed a real Google Platform Admin sign-in and the app showed the authenticated platform directory with no clinic selected. A dedicated test clinic, branch, and OWNER membership were then created in that isolated database. Real clinic Google sign-in succeeded and the app opened the clinic workspace and OWNER-only staff page. The user confirmed the invitee as `smitycristobal@gmail.com`.
 
-The real Google sign-in UI was exercised. The chooser initially offered an account not on the Platform Admin allowlist; its live sign-in was correctly denied. The owner then completed the password step and later confirmed completing the sign-in handoff. The user clarified that the intended invitee is `smitycristobal@gmail.com`, matching the previously offered Google identity. However, no authenticated app session was visible and the local app ports were unreachable at follow-up, so the owner’s completed OAuth callback could not be verified. No invitation was issued, and invitation acceptance/staff access have not been tested.
+Invitation issuance was attempted through the owner’s authenticated staff UI for the confirmed invitee and isolated branch. The form returned `ApiError: Bad Request`; read-only database verification found zero invitation records and zero clinic admin events, confirming the request did not complete. No invitation token was obtained. The recipient Google sign-in, invitation acceptance, and recipient staff access therefore remain untested and blocked on diagnosing the UI request failure. No identity token, password, or invitation token was logged or saved.
 
 The existing M1.4.2 browser suite used synthetic credentials and intercepted network calls; it is not evidence of real Google authentication or real invitation acceptance. The live test remains required for M1 closure.
 
@@ -53,8 +53,9 @@ The existing M1.4.2 browser suite used synthetic credentials and intercepted net
 - M1.4.4 source/preflight change: **1 preflight command passed**, shell syntax passed, whitespace/diff check passed.
 - Product test suites were not rerun during this documentation/preflight reconciliation.
 - Prior M1.4.2 reports record **30 backend + 24 frontend + 3 Playwright = 57 passed, 0 failed, 0 skipped**. These are historical recorded results, not M1.4.4 executions.
-- Real Google flow: **attempted against live Google Identity UI; unallowlisted account correctly denied; owner completed the requested sign-in handoff, but app authentication could not be verified because no authenticated app state was visible and local ports were unreachable**.
-- Invitation acceptance/staff access: **not run; intended invitee confirmed as `smitycristobal@gmail.com`; no invitation was issued**.
+- Real Google owner flow: **PASS for actual provider authentication**; owner authenticated to both Platform Admin and clinic staff UI. An earlier unallowlisted account was correctly denied.
+- Invitation creation: **BLOCKED**; authenticated UI returned `ApiError: Bad Request`, and isolated DB check confirmed no invitation persisted.
+- Recipient Google sign-in, invitation acceptance and staff access: **not run; blocked because invitation creation failed**. Recipient confirmed as `smitycristobal@gmail.com`.
 - Hosted CI run `39232339581`: **verified successful** (backend 30, frontend 24, browser pass, security pass; OWASP skipped by deferral).
 - Maven NVD scan: **deferred exception**, not a passed or failed scan.
 
