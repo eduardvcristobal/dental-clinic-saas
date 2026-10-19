@@ -1,7 +1,7 @@
 # M1.4.6 — Final M1 Acceptance Report
 
 **Date:** 2026-10-19  
-**Status:** M1 remains open pending hosted GitHub Actions for the M1.4.6 commit. M2 has not started. No production-readiness claim is made.
+**Status:** **M1 complete for development acceptance.** M2 has not started. The application is not production-ready; the NVD exception and production gates remain open.
 
 ## Result
 
@@ -23,7 +23,7 @@ Self-registration was enabled only in the temporary backend process used for tes
 | Backend and PostgreSQL regression | PASS | Java 17.0.20 Maven `clean verify`: 33 tests, 0 failures/errors/skips; fresh PostgreSQL 18.6 auth/migration DBs; V1–V14 and RLS gates |
 | Frontend regression | PASS | Node 24.18.0, npm 11.16.0; Oxlint; Vitest 25/25; TypeScript/Vite production build |
 | Browser regression | PASS | Playwright 4/4 passed, including role/branch form payload and responsive route checks |
-| Hosted CI latest commit | BLOCKED / NOT RUN | Saved GitHub CLI token is invalid; remote DNS resolution was unavailable. Older run `39232339581` is not evidence for M1.4.6. |
+| Hosted CI | PASS | Run [`39249898417`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39249898417), SHA `d9e230fc09fff40a3d11c9315361f86f058555bd`: `java17`, `frontend`, `browser`, and `security` succeeded; `owasp` skipped by accepted deferral. Hosted test total: 62 passed, 0 failed/skipped/blocked. |
 
 Total local automated checks: **62 passed, 0 failed, 0 skipped, 0 blocked** (33 backend + 25 frontend + 4 Playwright). Live manual E2E observations are documented separately and are not included in these test totals.
 
@@ -33,7 +33,7 @@ Total local automated checks: **62 passed, 0 failed, 0 skipped, 0 blocked** (33 
 
 ## Hosted workflow status
 
-The workflow is configured for Java 17, PostgreSQL 16, Maven verification/migrations/RLS, Node 24 lint/unit/build, Playwright, and Gitleaks. The optional OWASP NVD job remains conditional and deferred. GitHub CLI reported an invalid saved token, and the attempted remote lookup could not resolve GitHub DNS. No workflow run exists for the current M1.4.6 revision, and the historical successful run on SHA `2791a1c578f19174ea609b53ad84ed656fc9faf9` does not satisfy this gate. See [hosted CI evidence](M1_4_6_HOSTED_CI_EVIDENCE.md).
+Hosted run `39249898417` passed on SHA `d9e230fc09fff40a3d11c9315361f86f058555bd`. An initial run failed because the Gitleaks action lacked the parent commit in a shallow checkout; full history was enabled for that job and the rerun passed with no leaks detected. Dependency Review remains configured for pull requests and did not run on this push. OWASP remains skipped under its accepted deferral. See [hosted CI evidence](M1_4_6_HOSTED_CI_EVIDENCE.md).
 
 ## Security and production status
 
@@ -41,6 +41,6 @@ The Maven NVD dependency scan remains **DEFERRED — OWNER-ACCEPTED SECURITY EXC
 
 ## Acceptance recommendation
 
-Keep M1 open until the current commit passes hosted CI. Do not start M2 automatically. After hosted workflow evidence is recorded, review the complete checklist and decide development M1 closure. The NVD exception remains a production gate regardless of M1 status.
+M1 acceptance criteria are met for development: live Google invitation acceptance/replay protection, isolated clinic self-registration and tenant boundaries, local and hosted regression, and documentation are complete. M1 may be closed for development. Do not start M2 automatically. The NVD exception remains a production gate regardless of M1 status.
 
 Detailed evidence: [live invitation replay](M1_4_6_LIVE_INVITATION_REPLAY.md), [clinic registration E2E](M1_4_6_CLINIC_REGISTRATION_E2E.md), [hosted CI evidence](M1_4_6_HOSTED_CI_EVIDENCE.md), [PROJECT_STATUS.md](../PROJECT_STATUS.md), and the [M1 acceptance checklist](M1_4_ACCEPTANCE_CHECKLIST.md).

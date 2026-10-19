@@ -4,7 +4,7 @@
 **Authoritative baseline:** M0.3 working repository plus M0.4 validation fixes
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M0.5–M0.7 prototypes implemented; M1.1–M1.4 implementation, live invitation replay, live clinic registration, and local regression/database validation delivered; full M1 acceptance remains open pending hosted CI on the M1.4.6 commit; **not pilot-ready**.
+**Overall status:** M0.5–M0.7 prototypes implemented; M1.1–M1.4 implementation, live invitation replay, live clinic registration, and local regression/database validation delivered; M1 complete for development acceptance; hosted CI passed on the final M1.4.6 acceptance commit; **not production-ready**.
 
 ## Progress conventions
 
@@ -22,7 +22,7 @@
 | M0.5 | Role-specific application shell & connected UI previews | Implemented — review/verification pending | Responsive navigation, safe demo state, role-based previews, tests |
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
-| M1 | Clinics, branches, dentists, chairs, staff | **IN PROGRESS — live E2E passed; hosted CI on M1.4.6 commit pending** | Complete tenant/branch onboarding, permissions, real-account browser E2E, security and CI gates |
+| M1 | Clinics, branches, dentists, chairs, staff | **COMPLETE FOR DEVELOPMENT — live E2E and hosted CI passed; production gates remain open** | Complete tenant/branch onboarding, permissions, real-account browser E2E, security and CI gates |
 | M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
 | M4 | Odontogram | Not started | Adult/primary tooth surfaces, statuses, historical entries |
@@ -314,7 +314,7 @@ See [M1.4.5 final certification report](docs/M1_4_5_FINAL_CERTIFICATION_REPORT.m
 
 ## M1.4.6 — Final M1 acceptance closure (2026-10-19)
 
-**Status: M1 remains open pending current-commit hosted GitHub Actions. M2 has not started. The product is not production-ready.**
+**Status: M1 COMPLETE FOR DEVELOPMENT ACCEPTANCE. M2 has not started. The product is not production-ready.**
 
 - [x] Live invitation replay: created a fresh invitation in disposable database `dental_m146_e2e`, accepted it through real Google verification, then submitted the same invitation from a second in-memory browser form. The app returned HTTP 403, `Invalid or expired invitation`. Before/after read-only checks confirmed the accepted timestamp was unchanged; exactly one `FRONT_DESK` membership and one branch assignment existed, with one creation and one acceptance audit event. No invitation token, Google identity token, or credentials were logged or recorded.
 - [x] Live new-clinic self-registration: enabled only in the temporary backend process against `dental_m146_e2e`. Two authorized Google test identities registered two clinics. Each clinic had one active OWNER, one initial branch, `Asia/Manila` timezone, one owner-branch assignment, and one `CLINIC_CREATED` event. Owner Google login and the clinic Settings page worked for the first clinic; the second clinic's owner saw the second clinic's own Settings.
@@ -322,9 +322,9 @@ See [M1.4.5 final certification report](docs/M1_4_5_FINAL_CERTIFICATION_REPORT.m
 - [x] Self-registration remains disabled by default: `application.yml` defaults `app.onboarding.self-service-enabled` to `false`, and local `.env.local` remains disabled. After stopping the temporary enabled process and restarting with the local default, a registration request returned HTTP 403, `Clinic registration is not open`. No production configuration was changed.
 - [x] Registration failure regression: the Java/PostgreSQL suite verifies invalid slug and timezone (400), duplicate slug (409 with safe detail), invalid Google identity (401), and unapproved Origin (403). Duplicate and invalid attempts created no extra clinics.
 - [x] Final local regression: OpenJDK 17.0.20 `mvn clean verify` passed **33/33** tests against fresh local PostgreSQL 18.6 auth and migration databases; V1–V14 migrations and restricted-role RLS included. Frontend Oxlint passed, Vitest **25/25**, TypeScript/Vite production build passed, Playwright **4/4** passed. Total **62 passed, 0 failed, 0 skipped, 0 blocked**.
-- [ ] Hosted GitHub Actions for the M1.4.6 commit. The current CLI reports its saved GitHub token is invalid; an unauthenticated `git ls-remote` attempt was blocked by unavailable DNS. No current-commit run has been claimed. See `docs/M1_4_6_HOSTED_CI_EVIDENCE.md` for follow-up evidence.
+- [x] Hosted GitHub Actions run [`39249898417`](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39249898417) passed on SHA `d9e230fc09fff40a3d11c9315361f86f058555bd`: Java 17/PostgreSQL 16, frontend, browser, and security jobs succeeded; optional OWASP was skipped by accepted deferral. Hosted totals: 33 backend + 25 frontend + 4 Playwright = 62 passed, 0 failed, 0 skipped test cases, 0 blocked. Gitleaks reported no leaks. The first run failed because shallow checkout omitted the Gitleaks base commit; security checkout now fetches full history. Dependency Review remains PR-only and was not exercised on this push.
 - [ ] Dependency vulnerability scan remains **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION**, never PASS; complete a Maven vulnerability assessment before production deployment.
 
-Disposable test database `dental_m146_e2e` contains only test clinic/onboarding data and no patient records. M1 remains open until the current committed revision passes the hosted workflow. NVD deferral does not confer production security certification.
+Disposable test database `dental_m146_e2e` contains only test clinic/onboarding data and no patient records. M1 is complete for development acceptance. NVD deferral does not confer production security certification; the Maven vulnerability assessment, privacy/security review, operational controls, and production deployment verification remain mandatory before production use.
 
 See [M1.4.6 final acceptance report](docs/M1_4_6_FINAL_ACCEPTANCE_REPORT.md), [live invitation replay evidence](docs/M1_4_6_LIVE_INVITATION_REPLAY.md), [clinic registration E2E](docs/M1_4_6_CLINIC_REGISTRATION_E2E.md), and [hosted CI evidence](docs/M1_4_6_HOSTED_CI_EVIDENCE.md).

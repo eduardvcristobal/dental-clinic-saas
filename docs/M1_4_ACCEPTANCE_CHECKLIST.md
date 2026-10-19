@@ -1,11 +1,11 @@
 # M1.4 / M1 Final Acceptance Checklist
 
-Status as of 2026-10-19 (M1.4.6). **M1 remains open pending hosted CI for the current commit; do not start M2 or activate real patient data.** Live Google invitation acceptance/replay and two-clinic self-registration were verified in a disposable database.
+Status as of 2026-10-19 (M1.4.6). **M1 is complete for development acceptance. M2 has not started; do not activate real patient data or treat this as production readiness.** Live Google invitation acceptance/replay and two-clinic self-registration were verified in a disposable database.
 
 | Requirement | Result | Evidence / remaining action |
 |---|---|---|
-| Java 17 backend compilation and tests | PASS | M1.4.5: OpenJDK 17.0.20 Maven `clean verify`, 31 tests passed, 0 failed/errors/skipped; isolated PostgreSQL V1–V14 migration and RLS gate included |
-| Frontend compilation, lint and tests | PASS | M1.4.5: Oxlint passed; Vitest 25/25; TypeScript/Vite production build passed |
+| Java 17 backend compilation and tests | PASS | M1.4.6: local OpenJDK 17.0.20 Maven `clean verify`, 33 tests passed; hosted Java 17/PostgreSQL 16 Maven verification also passed 33/33 |
+| Frontend compilation, lint and tests | PASS | M1.4.6 local and hosted: Oxlint, TypeScript, production build passed; Vitest 25/25 |
 | PostgreSQL V1–V14 fresh migrations | PASS | Isolated disposable PostgreSQL 18.6 cluster (separate port; existing `dental` DB untouched); 14 successful migrations |
 | Existing V13 database upgrade | PASS | V14 applied as one migration; synthetic patient row preserved |
 | Google authentication smoke test | PASS | Real authorized clinic OWNER and invitee accounts signed in. The recipient reached the first clinic workspace as `Reception / Front Desk`. No credentials or identity tokens were recorded. |
@@ -21,7 +21,7 @@ Status as of 2026-10-19 (M1.4.6). **M1 remains open pending hosted CI for the cu
 | Updated documentation and tracker | PASS | README, setup docs, reports and `PROJECT_STATUS.md` updated |
 | Maven dependency vulnerability assessment | **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** | OWASP NVD scan is not PASS and remains unassessed; deferred to M10. A completed Maven vulnerability assessment with review of applicable high/critical findings is mandatory before production deployment. |
 | npm audit | PASS (recorded M1.4.2; not rerun in M1.4.4) | The M1.4.2 report records 0 vulnerabilities across severities. |
-| GitHub secret scanning / Gitleaks | PASS | Run 39232339581 security job succeeded; its summary states “No leaks detected.” |
+| GitHub secret scanning / Gitleaks | PASS | Run 39249898417 security job succeeded and reported “No leaks detected.” |
 | GitHub dependency review | NOT RUN (push event) | The action remains in the workflow for pull requests. Run 39232339581 was a push, so the PR-only dependency review step did not execute. |
 
-**M1.4.6 local totals:** backend 33 + frontend 25 + Playwright 4 = **62 passed, 0 failed, 0 skipped, 0 blocked**. Live Google invitation acceptance and replay rejection passed, including no duplicate membership or assignment. Two-clinic registration and RLS isolation passed. Keep M1 open until hosted CI passes on the M1.4.6 commit. Maven NVD remains **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION**, not PASS, and a Maven vulnerability assessment is required before production deployment. See [M1.4.6 final acceptance report](M1_4_6_FINAL_ACCEPTANCE_REPORT.md).
+**M1.4.6 local totals:** backend 33 + frontend 25 + Playwright 4 = **62 passed, 0 failed, 0 skipped, 0 blocked**. Live Google invitation acceptance and replay rejection passed, including no duplicate membership or assignment. Two-clinic registration and RLS isolation passed. M1 is complete for development acceptance; hosted CI passed on the final acceptance commit. Maven NVD remains **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION**, not PASS, and a Maven vulnerability assessment is required before production deployment. See [M1.4.6 final acceptance report](M1_4_6_FINAL_ACCEPTANCE_REPORT.md).
