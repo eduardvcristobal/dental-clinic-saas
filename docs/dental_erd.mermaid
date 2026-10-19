@@ -1,0 +1,43 @@
+erDiagram
+  CLINIC ||--o{ BRANCH : has
+  CLINIC ||--o{ APP_USER : employs
+  CLINIC ||--o{ DENTIST : employs
+  CLINIC ||--o{ PATIENT : serves
+  CLINIC ||--o{ PROCEDURE_CATALOG : prices
+  CLINIC ||--o{ APPOINTMENT_TYPE : defines
+  BRANCH ||--o{ CHAIR : contains
+  APP_USER ||--o| DENTIST : "may be"
+  APP_USER }o--o{ BRANCH : "works at"
+
+  PATIENT ||--o| PATIENT_MEDICAL_HISTORY : has
+  PATIENT ||--o{ CONSENT_FORM : signs
+  PATIENT ||--o{ FILE_ASSET : owns
+  PATIENT ||--o{ APPOINTMENT : books
+  PATIENT ||--o{ RECALL : "due for"
+  PATIENT ||--o{ TOOTH_RECORD : "charted in"
+  PATIENT ||--o{ TREATMENT_PLAN : receives
+  PATIENT ||--o{ VISIT : attends
+  PATIENT ||--o{ INVOICE : billed
+  PATIENT |o--o{ PATIENT : "guardian of"
+
+  DENTIST ||--o{ APPOINTMENT : handles
+  CHAIR ||--o{ APPOINTMENT : hosts
+  APPOINTMENT_TYPE ||--o{ APPOINTMENT : classifies
+  APPOINTMENT ||--o{ REMINDER : triggers
+  APPOINTMENT ||--o| VISIT : "becomes"
+
+  VISIT ||--o{ VISIT_PROCEDURE : records
+  VISIT ||--o{ PRESCRIPTION : issues
+  VISIT ||--o{ TOOTH_RECORD : updates
+  VISIT ||--o{ FILE_ASSET : attaches
+  VISIT ||--o| INVOICE : "billed in"
+
+  TREATMENT_PLAN ||--o{ TREATMENT_PLAN_ITEM : contains
+  PROCEDURE_CATALOG ||--o{ TREATMENT_PLAN_ITEM : "planned as"
+  PROCEDURE_CATALOG ||--o{ VISIT_PROCEDURE : "performed as"
+  TREATMENT_PLAN_ITEM ||--o{ VISIT_PROCEDURE : "completed by"
+  TREATMENT_PLAN_ITEM ||--o{ INVOICE_LINE : "billed as"
+
+  INVOICE ||--o{ INVOICE_LINE : contains
+  INVOICE ||--o{ PAYMENT : "paid by"
+  INVOICE ||--o{ PAYMENT_SCHEDULE : "split into"

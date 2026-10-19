@@ -1,0 +1,22 @@
+-- V7: indexes. clinic_id leads most of them because every query is tenant-scoped.
+CREATE INDEX idx_branch_clinic         ON branch (clinic_id);
+CREATE INDEX idx_user_clinic           ON app_user (clinic_id);
+CREATE INDEX idx_dentist_clinic        ON dentist (clinic_id);
+CREATE INDEX idx_patient_name          ON patient (clinic_id, last_name, first_name);
+CREATE INDEX idx_patient_phone         ON patient (clinic_id, phone);
+CREATE INDEX idx_medhist_patient       ON patient_medical_history (patient_id);
+CREATE INDEX idx_file_patient          ON file_asset (patient_id);
+CREATE INDEX idx_appt_calendar         ON appointment (clinic_id, branch_id, starts_at);
+CREATE INDEX idx_appt_patient          ON appointment (patient_id, starts_at DESC);
+CREATE INDEX idx_reminder_due          ON reminder (scheduled_for) WHERE status = 'SCHEDULED';
+CREATE INDEX idx_recall_due            ON recall (clinic_id, due_date) WHERE completed = false;
+CREATE INDEX idx_visit_patient         ON visit (patient_id, started_at DESC);
+CREATE INDEX idx_plan_patient          ON treatment_plan (patient_id);
+CREATE INDEX idx_plan_item_plan        ON treatment_plan_item (plan_id);
+CREATE INDEX idx_tooth_patient         ON tooth_record (patient_id, tooth_number);
+CREATE INDEX idx_visit_proc_visit      ON visit_procedure (visit_id);
+CREATE INDEX idx_invoice_patient       ON invoice (patient_id, status);
+CREATE INDEX idx_invoice_line_invoice  ON invoice_line (invoice_id);
+CREATE INDEX idx_payment_invoice       ON payment (invoice_id);
+CREATE INDEX idx_pay_sched_due         ON payment_schedule (clinic_id, due_date) WHERE paid = false;
+CREATE INDEX idx_audit_entity          ON audit_log (clinic_id, entity, entity_id);
