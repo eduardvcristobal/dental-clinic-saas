@@ -6,4 +6,4 @@ Monorepo foundation for a multi-tenant dental clinic management SaaS.
 - `frontend/`: React, TypeScript and Vite. See [frontend setup](frontend/README.md).
 - `docs/`: foundation audit and milestone validation reports.
 
-Current status: **M0.4 local validation passed; the project is not production or pilot ready.** Fresh PostgreSQL migration/RLS, backend auth/session integration, and frontend API/build checks passed locally. GitHub Actions and live Google/browser sign-in still need verification. See [PROJECT_STATUS.md](PROJECT_STATUS.md).
+Current status: **M1.4 automated and database validation passed locally; M1 is not certified or production/pilot ready.** Full Google/browser onboarding, invitation HTTP concurrency, responsive route review, saved screenshot evidence, dependency advisory scan, and hosted GitHub Actions remain open. See [PROJECT_STATUS.md](PROJECT_STATUS.md) and [M1.4 validation report](docs/M1_4_VALIDATION_REPORT.md).

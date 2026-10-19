@@ -17,7 +17,7 @@ CREATE DATABASE dental OWNER postgres;
 GRANT CONNECT ON DATABASE dental TO dental_app;
 ```
 
-Flyway runs as `DB_OWNER_USER`; application queries use `DB_APP_USER`. V8/V9/V10 enforce row-level security and same-clinic relationships. V11 adds an explicit global-access policy used only for allowlisted platform-admin sessions. Never use a superuser or `BYPASSRLS` role for application traffic.
+Flyway runs as `DB_OWNER_USER`; application queries use `DB_APP_USER`. V8/V9/V10 enforce row-level security and same-clinic relationships. V11 historically added global-access policies; V14 removes them so platform-admin sessions cannot read tenant clinical tables. Never use a superuser or `BYPASSRLS` role for application traffic.
 
 Copy `.env.example` values into your shell or a private local environment file (never commit it). Required values include database passwords, a Google web client ID, a unique `APP_JWT_SECRET` of at least 32 UTF-8 bytes, and exact allowed browser origins. Set `APP_COOKIE_SECURE=false` only for local HTTP; production requires HTTPS and secure cookies. Use the frontend Vite proxy for same-site local auth cookies.
 
@@ -59,4 +59,4 @@ Hibernate `@TenantId` scopes tenant entities. `TenantFilter` obtains tenant iden
 
 Google sign-in accepts existing active staff only. Access tokens are short-lived and held in frontend memory. Rotating refresh tokens are random, hashed in PostgreSQL, HttpOnly, SameSite=Strict, path-scoped cookies. Reuse of a revoked refresh token revokes active sessions for that user in that clinic. No public registration is provided.
 
-Platform administrators use a separate Google sign-in at `/platform-admin/login`. `CLINIC_PLATFORM_ADMIN_EMAILS` is a comma-separated backend allowlist. Such sessions contain no `clinic_id`; the verified platform-admin principal sets the database platform context used by V11 for cross-clinic operations. The web client ID must match between backend `GOOGLE_CLIENT_ID` and frontend `VITE_GOOGLE_CLIENT_ID`.
+Platform administrators use a separate Google sign-in at `/platform-admin/login`. `CLINIC_PLATFORM_ADMIN_EMAILS` is a comma-separated backend allowlist. Such sessions contain no `clinic_id`; they are limited to explicitly exposed platform administration endpoints. V14 removes broad RLS access, so a platform-admin principal cannot use its GUC to read tenant clinical records. The web client ID must match between backend `GOOGLE_CLIENT_ID` and frontend `VITE_GOOGLE_CLIENT_ID`.

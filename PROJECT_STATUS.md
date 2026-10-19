@@ -4,7 +4,7 @@
 **Authoritative baseline:** M0.3 working repository plus M0.4 validation fixes
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M0.7 frontend governance implemented; M0.6 patient journey simulation implemented; M0.5 visual verification and M0.4 security/CI/provider checks remain; **not pilot-ready**.
+**Overall status:** M0.5–M0.7 prototypes implemented; M1.1–M1.4 implementation and local regression/database validation delivered; full M1 acceptance is still open; **not pilot-ready**.
 
 ## Progress conventions
 
@@ -22,7 +22,7 @@
 | M0.5 | Role-specific application shell & connected UI previews | Implemented — review/verification pending | Responsive navigation, safe demo state, role-based previews, tests |
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
-| M1 | Clinics, branches, dentists, chairs, staff | M1.1–M1.3 implemented; validation pending | Complete tenant/branch onboarding, permissions and CRUD with tests |
+| M1 | Clinics, branches, dentists, chairs, staff | **IN PROGRESS — M1.4 local regression partial; certification gates remain** | Complete tenant/branch onboarding, permissions, browser E2E, security and CI gates |
 | M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
 | M4 | Odontogram | Not started | Adult/primary tooth surfaces, statuses, historical entries |
@@ -202,15 +202,29 @@ See `docs/M1_2_ONBOARDING_REPORT.md`. Do not treat M1.2 as fully tested or safe 
 
 ## M1.4 — Runtime regression & onboarding security certification (2026-10-19)
 
-**Status: PARTIALLY IMPLEMENTED; CERTIFICATION BLOCKED. Do not activate real patient data.**
+**Status: Local automated and PostgreSQL validation passed; M1.4 NOT CERTIFIED. M1 remains open.**
 
-- [x] Invitation acceptance now removes a URL-bearing secret immediately rather than after success; strict no-referrer page policy added.
-- [x] Extended disposable-PostgreSQL test for invitation same-tenant foreign keys, tenant RLS and single-use atomic transitions.
-- [x] Added fail-closed local validation runner and evidence report.
-- [ ] Execute JDK 17 Maven compile and JUnit tests (only JDK 21; no Maven here).
-- [ ] Execute PostgreSQL fresh V1–V14 and V13→V14 upgrade validations (no PG instance here).
-- [ ] Execute concurrent invitation acceptance through HTTP and verify one success/one staff record.
-- [ ] Verify real Google browser workflows and hosted CI.
-- [ ] Close all critical security findings before any patient data rollout.
+- [x] Java 17 / Maven clean verify: 26 backend tests passed, 0 failed, 0 skipped; Spring Boot JAR packaged.
+- [x] Frontend `npm ci`, tests (15/15), TypeScript/Vite production build, and lint completed. Lint reports two React warnings in `StaffOnboarding.tsx`.
+- [x] Fresh isolated PostgreSQL V1–V14 migration and restricted-role RLS/auth integration passed.
+- [x] Separate V13 database upgraded by applying V14 only; synthetic patient row persisted; restricted role with platform-admin GUC read zero patient and app_user rows.
+- [x] Registration screen visually inspected; registration remains disabled by default and API create attempt returned 403. Unauthenticated Platform Admin API request returned 401.
+- [x] Validation, final regression, security, and E2E reports updated.
+- [ ] Real Google sign-in; complete authenticated browser onboarding; HTTP invitation acceptance concurrency; responsive multi-route review; saved screenshots; hosted GitHub Actions and dependency advisory scan.
+- [ ] Do not activate real patient data or proceed to M2 until remaining M1 gates pass.
 
-Evidence: `docs/M1_4_VALIDATION_REPORT.md`. M1 remains open pending actual certification evidence.
+Overall automated totals: **41 passed, 0 failed, 0 skipped, 0 blocked** on the successful rerun. The first in-sandbox run was blocked by loopback/socket permissions and was rerun with networking enabled. Existing local `dental` database was not modified. GitHub Actions was reviewed but not pushed/run because no remote is configured and the owner previously deferred workflow use.
+
+See [validation report](docs/M1_4_VALIDATION_REPORT.md), [final regression report](docs/M1_4_FINAL_REGRESSION_REPORT.md), [security certification](docs/M1_4_SECURITY_CERTIFICATION.md), and [E2E report](docs/M1_4_E2E_REPORT.md).
+
+## Next recommended task
+
+Finish M1 acceptance: authorize and run a real Google sign-in smoke check, then execute local browser onboarding and invitation concurrency against a disposable database, save responsive UI evidence, and run hosted CI when an authorized remote/branch is configured. Keep M2 blocked until all acceptance gates pass.
+
+## M1.4 local validation update (2026-10-19)
+
+- Successful verification: backend 26/26, frontend 15/15, production build passed, lint completed with two React warnings.
+- PostgreSQL 18.6 fresh V1–V14 and V13→V14 upgrade passed in temporary isolated databases; the existing `dental` database was untouched.
+- V14 left no `platform_admin_access` policy; `dental_app` could not view patient or app_user rows with the platform-admin GUC set. Synthetic upgrade patient remained present for its clinic.
+- Browser smoke verified the registration form and HTTP disabled-registration/API authorization boundaries. Full real Google and onboarding E2E, responsive screenshot files, hosted CI, and dependency advisory scan remain unverified.
+- M1 remains open. Do not proceed to M2 or use real patient records.
