@@ -91,6 +91,31 @@ class MigrationAndTenantIsolationTest {
             }
             app.rollback();
         }
+        // Invitation isolation and one-time claim must be enforced by the database, not just the UI.
+        UUID branchA=UUID.randomUUID(), branchB=UUID.randomUUID(), inviterA=UUID.randomUUID();
+        UUID invitationA=UUID.randomUUID(), invitationB=UUID.randomUUID();
+        try (Connection owner = ownerConnection(); var s = owner.createStatement()) {
+            s.execute("INSERT INTO branch(id,clinic_id,name) VALUES ('"+branchA+"','"+clinicA+"','Main A'),('"+branchB+"','"+clinicB+"','Main B')");
+            s.execute("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role) VALUES ('"+inviterA+"','"+clinicA+"','invite-a@test.invalid','x','Inviter A','OWNER')");
+            s.execute("INSERT INTO staff_invitation(id,clinic_id,email,role,branch_id,token_hash,invited_by,expires_at) VALUES " +
+                "('"+invitationA+"','"+clinicA+"','candidate-a@test.invalid','DENTIST','"+branchA+"','test-hash-a','"+inviterA+"',now()+interval '1 day')");
+            assertThrows(SQLException.class, () -> s.execute("INSERT INTO staff_invitation(id,clinic_id,email,role,branch_id,token_hash,invited_by,expires_at) VALUES " +
+                "('"+invitationB+"','"+clinicA+"','cross@test.invalid','DENTIST','"+branchB+"','test-hash-b','"+inviterA+"',now()+interval '1 day')"));
+        }
+        try (Connection app = appConnection(); var s = app.createStatement()) {
+            s.execute("SELECT set_config('app.clinic_id','"+clinicA+"',false)");
+            try (var rs=s.executeQuery("SELECT count(*) FROM staff_invitation")) {rs.next(); assertThat(rs.getInt(1)).isEqualTo(1);}
+            assertThat(s.executeUpdate("UPDATE staff_invitation SET revoked_at=now() WHERE id='"+invitationB+"'")).isZero();
+            // Single-use claim is expressed as an atomic conditional UPDATE.
+            assertThat(s.executeUpdate("UPDATE staff_invitation SET accepted_at=now() WHERE id='"+invitationA+"' AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>now()")) .isEqualTo(1);
+            assertThat(s.executeUpdate("UPDATE staff_invitation SET accepted_at=now() WHERE id='"+invitationA+"' AND accepted_at IS NULL AND revoked_at IS NULL AND expires_at>now()")) .isZero();
+            assertThat(s.executeUpdate("UPDATE staff_invitation SET revoked_at=now() WHERE id='"+invitationA+"' AND accepted_at IS NULL")) .isZero();
+        }
+        try (Connection app = appConnection(); var s = app.createStatement()) {
+            s.execute("SELECT set_config('app.clinic_id','"+clinicB+"',false)");
+            try (var rs=s.executeQuery("SELECT count(*) FROM staff_invitation")) {rs.next(); assertThat(rs.getInt(1)).isZero();}
+            assertThat(s.executeUpdate("UPDATE staff_invitation SET revoked_at=now() WHERE id='"+invitationA+"'")) .isZero();
+        }
         // Earlier V11's global permission must no longer reveal patient rows.
         try (Connection app = appConnection(); var s = app.createStatement()) {
             s.execute("SELECT set_config('app.platform_admin','true',false)");

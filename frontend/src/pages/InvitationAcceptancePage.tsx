@@ -1,11 +1,15 @@
 import { GoogleLogin } from '@react-oauth/google'
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 
 export function InvitationAcceptancePage() {
   const [params] = useSearchParams()
   const [token,setToken] = useState(params.get('token') ?? '')
+  // Remove the bearer credential from the address bar even when acceptance fails.
+  useLayoutEffect(() => {
+    if (params.has('token')) window.history.replaceState(window.history.state, '', '/accept-invitation')
+  }, [params])
   const [fullName,setFullName] = useState('')
   const [error,setError] = useState('')
   const [accepted,setAccepted] = useState(false)

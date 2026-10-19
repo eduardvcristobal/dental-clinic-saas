@@ -199,3 +199,18 @@ See `docs/M1_2_ONBOARDING_REPORT.md`. Do not treat M1.2 as fully tested or safe 
 
 **Security/verification report:** `docs/M1_3_SECURITY_VALIDATION_REPORT.md`.
 **Do not activate real patient data or claim M1.3 production complete until all security gates pass.**
+
+## M1.4 — Runtime regression & onboarding security certification (2026-10-19)
+
+**Status: PARTIALLY IMPLEMENTED; CERTIFICATION BLOCKED. Do not activate real patient data.**
+
+- [x] Invitation acceptance now removes a URL-bearing secret immediately rather than after success; strict no-referrer page policy added.
+- [x] Extended disposable-PostgreSQL test for invitation same-tenant foreign keys, tenant RLS and single-use atomic transitions.
+- [x] Added fail-closed local validation runner and evidence report.
+- [ ] Execute JDK 17 Maven compile and JUnit tests (only JDK 21; no Maven here).
+- [ ] Execute PostgreSQL fresh V1–V14 and V13→V14 upgrade validations (no PG instance here).
+- [ ] Execute concurrent invitation acceptance through HTTP and verify one success/one staff record.
+- [ ] Verify real Google browser workflows and hosted CI.
+- [ ] Close all critical security findings before any patient data rollout.
+
+Evidence: `docs/M1_4_VALIDATION_REPORT.md`. M1 remains open pending actual certification evidence.
