@@ -4,7 +4,7 @@
 **Authoritative baseline:** M0.3 working repository plus M0.4 validation fixes
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M0.4 local gates passed; **CI/provider verification remains; not pilot-ready**.
+**Overall status:** M0.5 UI implementation added; M0.4 security/CI/provider checks remain; **not pilot-ready**.
 
 ## Progress conventions
 
@@ -19,6 +19,7 @@
 | ID | Milestone | Status | Acceptance gate |
 |---|---|---|---|
 | M0 | Foundation audit & setup | **In progress — M0.4 local validation passed; CI/provider checks open** | Java 17, local PG migration/RLS/auth tests, frontend checks passed; hosted CI and browser/provider verification pending |
+| M0.5 | Role-specific application shell & connected UI previews | Implemented — review/verification pending | Responsive navigation, safe demo state, role-based previews, tests |
 | M1 | Clinics, branches, dentists, chairs, staff | Not started | Complete tenant/branch onboarding, permissions and CRUD with tests |
 | M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
@@ -100,3 +101,19 @@ Complete a live Google sign-in smoke check at `/platform-admin/login` (after con
 
 - **2026-10-19 — M0.4 validation and hardening:** corrected Java 17 compile errors; added V10 tenant composite constraints; ran fresh V1–V10 PostgreSQL migration, Hibernate validation, restricted-role RLS and same-clinic tests on local PostgreSQL 18.6; added actual HTTP auth/refresh/concurrency tests, claim validation, replay revocation, login/refresh throttles and error-dispatch correction; added frontend API tests and passed TypeScript/Vite/lint. Backend: 13/13 passed. Frontend: 3/3 passed. M0.4 remains in progress pending GitHub Actions and live browser/provider verification.
 - **2026-10-19 — Platform-admin access:** added allowlisted tenantless Google sessions, refresh rotation/revocation, no-clinic JWT validation, platform-admin UI and cross-clinic summary endpoint. V11 migration applied to local `dental`; Java compile and frontend build passed. Automated tests and live Google sign-in were not rerun.
+
+## M0.5 — Application UI and role-oriented navigation (2026-10-19)
+
+**Status: Implementation delivered; verification and design review pending.** This milestone does not close M0.4 security/provider/CI blockers and does not start M1.
+
+- [x] Added React application sidebar and responsive page shell for clinic users; existing sign-in and separate Platform Admin routes preserved.
+- [x] Added role-specific Command Center layouts for `OWNER`, `ADMIN`, `DENTIST`, and `FRONT_DESK`, the four current clinic backend roles. A dedicated `BILLING_STAFF` role is **not** implemented and must be designed with backend permissions in a later milestone.
+- [x] Added Patient 360° preview with medical history, FDI adult odontogram selection, a local-only SOAP draft field, plans, visits, and billing examples.
+- [x] Added Calendar (day/week/chair mock views), Patients (fictional client-side search), Billing and Reports previews, and intentional coming-soon pages for other planned modules.
+- [x] Added explicit preview/coming-soon capability catalog and visibility by current clinic role. These **are presentation controls only**, never an API permission or entitlement enforcement mechanism.
+- [x] All illustrative names, clinical data and currency amounts labeled fictional; no prototype edits persist or call a clinical API.
+- [x] Added unit tests for clinic role menu visibility and feature-state labels.
+- [ ] Human desktop/mobile visual review, real Google/browser login smoke tests, and hosted CI confirmation.
+- [ ] Live clinic data, authenticated global search, real branch selection, notices, and modules remain future milestones.
+
+**Security boundary:** Front-end role gating is not authorization. Real APIs must enforce backend permission checks and PostgreSQL tenant isolation. Platform Admin's privileged RLS test/audit findings remain open for production readiness.
