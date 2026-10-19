@@ -47,6 +47,8 @@ function Patient360({ role }: { role: WorkspaceRole }) {
   useEffect(() => {
     let live=true
     if(!selectedId){setPatient(null);return}
+    setPatient(null) // Never display the previous patient while a new record is being authorized.
+    setError('')
     setLoading(true)
     void api<Patient>(`/api/patients/${encodeURIComponent(selectedId)}`).then(p=>{if(live){setPatient(p);setError('')}}).catch(e=>{if(live){setPatient(null);setError(e instanceof Error?e.message:'Patient not available')}}).finally(()=>{if(live)setLoading(false)})
     return ()=>{live=false}
@@ -65,7 +67,7 @@ function Patient360({ role }: { role: WorkspaceRole }) {
     <div className="ws-heading"><div><span className="ws-eyebrow">Clinical / Patient 360° · M2.3</span><h1>Patient 360°</h1><p>Verified clinic patient identities and their recorded care foundation. Future workflows remain unavailable.</p></div></div>
     {error&&<p role="alert" className="ws-global-warning">{error}</p>}
     {!selectedId&&<div className="ws-panel ws-management"><h3>Select a patient</h3><label>Search clinic registry<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Name, chart number or phone"/></label>{loading&&<p>Loading patient records…</p>}<div className="ws-directory">{rows.map(p=><button key={p.id} onClick={()=>open(p.id)}><b>{p.first_name} {p.last_name}</b><small>{p.chart_no}</small></button>)}</div><p className="ws-subtle">Only patients belonging to your authenticated clinic can be opened. No fictional patient is selected automatically.</p></div>}
-    {selectedId&&<><button onClick={()=>{setParams({});setPatient(null)}}>← Return to patient search</button>{loading&&<p>Loading patient…</p>}{patient&&<>
+    {selectedId&&<><button onClick={()=>{setParams({});setPatient(null)}}>← Return to patient search</button>{loading&&<p>Loading patient…</p>}{patient&&patient.id===selectedId&&<>
       <div className="ws-panel ws-patient-head"><div className="ws-avatar">{patient.first_name.slice(0,1)}{patient.last_name.slice(0,1)}</div><div><h2>{patient.first_name} {patient.last_name}</h2><p>{patient.chart_no} · Date of birth: {patient.birth_date??'Not recorded'} · {patient.phone??'No phone listed'}</p></div><span className="ws-demo-chip">CLINIC RECORD · TEST DATA ONLY</span></div>
       <div className="ws-tabs" role="tablist" aria-label="Patient sections">{[['overview','Overview'],['care','History, guardians & consent'],['chart','Odontogram'],['visits','Visits & SOAP'],['plans','Treatment plans'],['billing','Billing']].map(([id,label])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'selected':''} onClick={()=>setTab(id)}>{label}</button>)}</div>
       {tab==='overview'&&<div className="ws-panel ws-management"><h3>Patient details</h3><div className="ws-info-grid"><div><small>Name</small><strong>{patient.first_name} {patient.last_name}</strong></div><div><small>Chart number</small><strong>{patient.chart_no}</strong></div><div><small>Birth date</small><strong>{patient.birth_date??'Not recorded'}</strong></div><div><small>Contact</small><strong>{patient.phone??'Not recorded'}</strong></div><div><small>Email</small><strong>{patient.email??'Not recorded'}</strong></div></div><p>Medical history and consent records are available under History, guardians & consent, subject to your access level.</p><NavLink to="/workspace/patients">Edit demographics in Patient Registry →</NavLink></div>}

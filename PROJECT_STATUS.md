@@ -369,3 +369,17 @@ See `docs/M2_2_DELIVERY_REPORT.md`. NVD scan remains deferred to M10 and remains
 - [ ] Minor legal-guardian authority, signed informed consent and patient identity merge/reconciliation remain out of scope and must not be treated as verified.
 
 See `docs/M2_3_INTEGRATION_REPORT.md` for delivery scope and validation checklist.
+
+## M2.4 — Patient identity, guardian and consent security regression (2026-10-19)
+
+**Implementation: delivered; full runtime certification: BLOCKED / PENDING. M2 remains open.**
+
+- Updated Patient 360° to clear patient details before authorization of a new UUID and reject displaying records whose ID does not match the active URL selection.
+- Prevented out-of-order patient medical-history responses from overriding the selected patient's current data; guardian forms retain entered information if a write fails.
+- Added clear UI cautions that guardians are unverified contacts and UNSIGNED/ACKNOWLEDGED consent records are not treatment consent.
+- Identity review now excludes archived charts from the current patient lookup. Added controller regression tests for clinical-role denial, archived/foreign patient lookup, identity review filtering and consent re-acknowledgement denial.
+- **Verified here:** source diff validation (`git diff --check`), local ZIP integrity and source review.
+- **Blocked here:** `npm ci --offline` failed because `why-is-node-running@3.2.1` is not cached. Maven/Java 17 and PostgreSQL are unavailable; backend tests, V1–V15 Flyway/RLS checks, frontend compile/Vitest and authenticated Playwright were **not executed**. The installed Java is 21, not 17.
+- **Exit criteria:** Java 17 `mvn clean verify`, clean PostgreSQL migration plus cross-clinic restricted-role RLS, npm `ci/lint/test/build`, live synthetic authenticated Playwright across Owner/Admin/Dentist/Front Desk, minor and guardian scenarios, consent transition validation and foreign UUID denial. Do not use real patient data.
+
+See `docs/M2_4_SECURITY_REGRESSION_REPORT.md`.

@@ -95,7 +95,7 @@ public class PatientCareController {
  @GetMapping("/identity-review") @Transactional(readOnly=true)
  public Map<String,Object> identityReview(Authentication auth,@PathVariable UUID patientId) {
   AuthPrincipal p=staff(auth);patient(p.clinicId(),patientId);
-  Map<String,Object> base=db.queryForMap("SELECT id,chart_no,first_name,last_name,birth_date FROM patient WHERE clinic_id=? AND id=?",p.clinicId(),patientId);
+  Map<String,Object> base=db.queryForMap("SELECT id,chart_no,first_name,last_name,birth_date FROM patient WHERE clinic_id=? AND id=? AND deleted_at IS NULL",p.clinicId(),patientId);
   Object birth=base.get("birth_date");
   if(birth==null)return Map.of("patient",base,"candidates",List.of(),"reviewRequired",false);
   List<Map<String,Object>> matches=db.queryForList("SELECT id,chart_no,first_name,last_name,birth_date FROM patient WHERE clinic_id=? AND id<>? AND deleted_at IS NULL AND lower(trim(first_name))=lower(trim(?)) AND lower(trim(last_name))=lower(trim(?)) AND birth_date=? ORDER BY created_at LIMIT 20",p.clinicId(),patientId,base.get("first_name"),base.get("last_name"),birth);
