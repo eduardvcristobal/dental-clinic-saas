@@ -8,9 +8,13 @@ const RESERVED = new Set(['www', 'app', 'api', 'localhost'])
  * authorization always comes from the backend session, never from this value.
  */
 export function slugFromHost(hostname: string = window.location.hostname): string | null {
-  const parts = hostname.split('.')
+  const host = hostname.trim().toLowerCase().replace(/\.$/, '')
+  if (host.includes(':')) return null // IPv6 literal, e.g. [::1]
+  const parts = host.split('.')
+  // An IP address such as 127.0.0.1 has a first label ("127") that is not a clinic subdomain.
+  if (parts.length >= 3 && parts.every((part) => /^\d+$/.test(part))) return null
   if (parts.length < 3) return null
-  const first = parts[0].toLowerCase()
+  const first = parts[0]
   return RESERVED.has(first) ? null : first
 }
 

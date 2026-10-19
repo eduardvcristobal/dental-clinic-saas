@@ -1,8 +1,8 @@
-import { GoogleLogin } from '@react-oauth/google'
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/useAuth'
+import { GoogleCredentialButton } from '../auth/GoogleCredentialButton'
 import { getRememberedSlug, normalizeSlug, rememberSlug, slugFromHost } from '../lib/tenant'
 
 export function LoginPage() {
@@ -66,7 +66,7 @@ export function LoginPage() {
 
         <div className={`google-slot ${busy ? 'busy' : ''}`}>
           {clinicSlug ? (
-            <GoogleLogin
+            <GoogleCredentialButton
               onSuccess={(res) => void handleCredential(res.credential)}
               onError={() => setError('Google sign-in was cancelled or failed.')}
               text="signin_with"

@@ -53,7 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await logout()
     } finally {
-      googleLogout() // stop Google's auto-select from silently signing the next person in
+      // Google's auto-select must never silently sign the next person in, but a failure or absence of
+      // the script must not stop the local session from being cleared either.
+      try {
+        googleLogout()
+      } catch {
+        /* GSI unavailable: the local session is still ended below */
+      }
       clear()
     }
   }, [clear])

@@ -1,8 +1,8 @@
-import { GoogleLogin } from '@react-oauth/google'
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/useAuth'
+import { GoogleCredentialButton } from '../auth/GoogleCredentialButton'
 
 export function PlatformAdminLoginPage() {
   const { status, session, signInAsPlatformAdmin } = useAuth()
@@ -41,7 +41,7 @@ export function PlatformAdminLoginPage() {
         <h1>Platform administration</h1>
         <p className="muted">Sign in with an allowlisted Google account. No clinic code is required.</p>
         <div className={`google-slot ${busy ? 'busy' : ''}`}>
-          <GoogleLogin
+          <GoogleCredentialButton
             onSuccess={(res) => void handleCredential(res.credential)}
             onError={() => setError('Google sign-in was cancelled or failed.')}
             text="signin_with"

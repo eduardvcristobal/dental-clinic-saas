@@ -1,7 +1,7 @@
-import { GoogleLogin } from '@react-oauth/google'
 import { useLayoutEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
+import { GoogleCredentialButton } from '../auth/GoogleCredentialButton'
 
 export function InvitationAcceptancePage() {
   const [params] = useSearchParams()
@@ -30,7 +30,7 @@ export function InvitationAcceptancePage() {
       <label className="field">Invitation token<input type="password" required autoComplete="off" value={token} onChange={e=>setToken(e.target.value)}/></label>
       <label className="field">Your full name<input required value={fullName} onChange={e=>setFullName(e.target.value)}/></label>
       {error && <p role="alert" className="error">{error}</p>}
-      {token && fullName && !busy && <GoogleLogin onSuccess={r=>void accept(r.credential)} onError={()=>setError('Google verification failed')}/>}
+      {token && fullName && !busy && <GoogleCredentialButton onSuccess={r=>void accept(r.credential)} onError={()=>setError('Google verification failed')}/>}
     </>}
     <Link to="/login">Back to sign in</Link>
   </section></main>

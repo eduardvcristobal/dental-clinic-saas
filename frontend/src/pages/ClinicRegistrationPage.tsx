@@ -1,7 +1,7 @@
-import { GoogleLogin } from '@react-oauth/google'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { GoogleCredentialButton } from '../auth/GoogleCredentialButton'
 
 export function ClinicRegistrationPage() {
   const [slug, setSlug] = useState('')
@@ -31,7 +31,7 @@ export function ClinicRegistrationPage() {
       <label className="field">Owner full name<input required value={ownerName} onChange={e=>setOwnerName(e.target.value)}/></label>
       {error && <p role="alert" className="error">{error}</p>}
       <p className="muted small">Complete all fields, then verify with the first owner's Google account.</p>
-      {slug && name && branchName && timezone && ownerName && !busy && <GoogleLogin onSuccess={r=>void create(r.credential)} onError={()=>setError('Google verification failed')}/>}
+      {slug && name && branchName && timezone && ownerName && !busy && <GoogleCredentialButton onSuccess={r=>void create(r.credential)} onError={()=>setError('Google verification failed')}/>}
     </>}
     <Link to="/login">Back to sign in</Link>
   </section></main>

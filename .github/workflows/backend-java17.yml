@@ -58,7 +58,7 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: setup-node@v4
         with:
           node-version: '24'
           cache: npm
@@ -68,6 +68,33 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # The browser suite is fully offline: it starts its own Vite dev server with a synthetic Google
+  # client ID and intercepts every network call, so it needs no secrets and never touches a backend.
+  browser:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-evidence
+          path: |
+            docs/evidence/m1_4_1/
+            frontend/test-results/
+          retention-days: 14
 
   security:
     runs-on: ubuntu-latest
@@ -81,3 +108,29 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/dependency-review-action@v4
         if: github.event_name == 'pull_request'
+
+  # Long: downloads the NVD catalog. Runs only when an NVD_API_KEY repository secret is configured,
+  # because anonymously throttled NVD downloads routinely exceed the job time limit.
+  owasp:
+    runs-on: ubuntu-latest
+    if: vars.RUN_OWASP_SCAN == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: OWASP dependency-check (backend)
+        working-directory: backend
+        run: >
+          mvn -B -ntp org.owasp:dependency-check-maven:12.1.0:check
+          -DfailBuildOnCVSS=9 -DfailOnError=false
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owasp-report
+          path: backend/target/dependency-check-report.html
+          retention-days: 14

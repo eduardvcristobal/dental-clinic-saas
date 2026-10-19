@@ -96,6 +96,9 @@ class AuthIntegrationTest {
         properties.add("app.auth.allowed-origins", () -> "http://localhost:5173");
         properties.add("app.auth.login-requests-per-minute", () -> "1000");
         properties.add("app.auth.refresh-requests-per-minute", () -> "1000");
+        properties.add("app.auth.platform-admin-emails", () -> "platform-admin@test.invalid");
+        // Deliberately enabled only inside this disposable integration-test ApplicationContext.
+        properties.add("app.onboarding.self-service-enabled", () -> "true");
     }
 
     @Autowired JdbcTemplate jdbc;
@@ -123,6 +126,7 @@ class AuthIntegrationTest {
         otherUserId = UUID.randomUUID();
         otherPatientId = UUID.randomUUID();
         TenantContext.runAs(clinicId, () -> {
+            jdbc.update("INSERT INTO branch(id,clinic_id,name) VALUES (?,?,?)", UUID.randomUUID(), clinicId, "Synthetic Main Branch A");
             jdbc.update("""
             INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active)
             VALUES (?,?,?,?,?,'OWNER',true)
@@ -135,6 +139,7 @@ class AuthIntegrationTest {
                     UUID.randomUUID(), clinicId, "A-" + slug, "Patient", "A");
         });
         TenantContext.runAs(otherClinicId, () -> {
+            jdbc.update("INSERT INTO branch(id,clinic_id,name) VALUES (?,?,?)", UUID.randomUUID(), otherClinicId, "Synthetic Main Branch B");
             jdbc.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VALUES (?,?,?,?,?,'OWNER',true)",
                     otherUserId, otherClinicId, "other-" + otherSlug + "@test.invalid", "unused", "Other Staff");
             jdbc.update("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (?,?,?,?,?)",
@@ -254,6 +259,132 @@ class AuthIntegrationTest {
              var result = statement.executeQuery("SELECT count(*) FROM app_user")) {
             result.next(); assertThat(result.getInt(1)).isZero();
         }
+    }
+
+    @Test void clinicOwnerInvitationAcceptanceBranchDentistAndAuditLifecycleWorkOverHttp() throws Exception {
+        String ownerEmail = "onboard-owner-" + UUID.randomUUID() + "@test.invalid";
+        String clinicSlug = "onboard-" + UUID.randomUUID().toString().substring(0, 8);
+        var create = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(java.util.Map.of(
+                "googleIdToken", validToken(ownerEmail), "slug", clinicSlug, "name", "Synthetic Onboarding Clinic",
+                "timezone", "Asia/Manila", "branchName", "Synthetic Main Branch", "ownerName", "Synthetic Owner")),
+                null, "http://localhost:5173", null);
+        assertThat(create.statusCode()).isEqualTo(201);
+        var created = objectMapper.readTree(create.body());
+        UUID createdClinic = UUID.fromString(created.get("clinicId").asText());
+        UUID branchId = UUID.fromString(created.get("branchId").asText());
+        UUID ownerId = UUID.fromString(created.get("ownerId").asText());
+        TenantContext.runAs(createdClinic, () -> {
+            assertThat(jdbc.queryForObject("SELECT timezone FROM clinic WHERE id=?", String.class, createdClinic)).isEqualTo("Asia/Manila");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM branch WHERE id=? AND clinic_id=?", Integer.class, branchId, createdClinic)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM user_branch WHERE user_id=? AND clinic_id=? AND branch_id=?", Integer.class, ownerId, createdClinic, branchId)).isEqualTo(1);
+        });
+
+        var ownerLogin = login(clinicSlug, validToken(ownerEmail), "http://localhost:5173");
+        assertThat(ownerLogin.statusCode()).isEqualTo(200);
+        String ownerAccess = objectMapper.readTree(ownerLogin.body()).get("accessToken").asText();
+        String staffEmail = "onboard-dentist-" + UUID.randomUUID() + "@test.invalid";
+        var invited = request("POST", "/api/onboarding/invitations", objectMapper.writeValueAsString(
+                java.util.Map.of("email", staffEmail, "role", "DENTIST", "branchId", branchId)),
+                null, "http://localhost:5173", "Bearer " + ownerAccess);
+        assertThat(invited.statusCode()).isEqualTo(201);
+        var invitation = objectMapper.readTree(invited.body());
+        String inviteToken = invitation.get("token").asText();
+        UUID inviteId = UUID.fromString(invitation.get("id").asText());
+
+        var wrongEmail = request("POST", "/api/onboarding/accept", objectMapper.writeValueAsString(java.util.Map.of(
+                "googleIdToken", validToken("wrong-recipient-" + UUID.randomUUID() + "@test.invalid"),
+                "token", inviteToken, "fullName", "Synthetic Wrong Recipient")), null, "http://localhost:5173", null);
+        assertThat(wrongEmail.statusCode()).isEqualTo(403);
+        var accepted = request("POST", "/api/onboarding/accept", objectMapper.writeValueAsString(java.util.Map.of(
+                "googleIdToken", validToken(staffEmail), "token", inviteToken, "fullName", "Synthetic Dentist")),
+                null, "http://localhost:5173", null);
+        assertThat(accepted.statusCode()).isEqualTo(200);
+        UUID staffId = UUID.fromString(objectMapper.readTree(accepted.body()).get("userId").asText());
+        assertThat(request("POST", "/api/onboarding/accept", objectMapper.writeValueAsString(java.util.Map.of(
+                "googleIdToken", validToken(staffEmail), "token", inviteToken, "fullName", "Synthetic Dentist")),
+                null, "http://localhost:5173", null).statusCode()).isEqualTo(403);
+
+        var staffLogin = login(clinicSlug, validToken(staffEmail), "http://localhost:5173");
+        assertThat(staffLogin.statusCode()).isEqualTo(200);
+        TenantContext.runAs(createdClinic, () -> {
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE id=? AND active=true AND role='DENTIST'", Integer.class, staffId)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM user_branch WHERE user_id=? AND clinic_id=? AND branch_id=?", Integer.class, staffId, createdClinic, branchId)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_invitation WHERE id=? AND accepted_at IS NOT NULL", Integer.class, inviteId)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM clinic_admin_event WHERE clinic_id=?", Integer.class, createdClinic)).isEqualTo(3);
+        });
+
+        var dentist = request("POST", "/api/onboarding/dentists", objectMapper.writeValueAsString(java.util.Map.of(
+                "userId", staffId, "fullName", "Synthetic Dentist", "licenseNo", "TEST-LICENSE-001", "specialty", "General Dentistry")),
+                null, "http://localhost:5173", "Bearer " + ownerAccess);
+        assertThat(dentist.statusCode()).isEqualTo(201);
+        TenantContext.runAs(createdClinic, () -> assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM dentist WHERE user_id=? AND clinic_id=?", Integer.class, staffId, createdClinic)).isEqualTo(1));
+    }
+
+    @Test void revokedAndExpiredInvitationsCannotBeAccepted() throws Exception {
+        String ownerAccess = objectMapper.readTree(login(slug, validToken(email()), "http://localhost:5173").body()).get("accessToken").asText();
+        UUID branch = TenantContext.callAs(clinicId, () -> jdbc.queryForObject("SELECT id FROM branch WHERE clinic_id=? LIMIT 1", UUID.class, clinicId));
+        String revokedEmail = "revoked-" + UUID.randomUUID() + "@test.invalid";
+        var revokedInvite = request("POST", "/api/onboarding/invitations", objectMapper.writeValueAsString(java.util.Map.of(
+                "email", revokedEmail, "role", "FRONT_DESK", "branchId", branch)), null, "http://localhost:5173", "Bearer " + ownerAccess);
+        var revoked = objectMapper.readTree(revokedInvite.body());
+        UUID revokedId = UUID.fromString(revoked.get("id").asText());
+        assertThat(request("POST", "/api/onboarding/invitations/" + revokedId + "/revoke", null,
+                null, "http://localhost:5173", "Bearer " + ownerAccess).statusCode()).isEqualTo(204);
+        assertThat(request("POST", "/api/onboarding/accept", objectMapper.writeValueAsString(java.util.Map.of(
+                "googleIdToken", validToken(revokedEmail), "token", revoked.get("token").asText(), "fullName", "Synthetic Staff")),
+                null, "http://localhost:5173", null).statusCode()).isEqualTo(403);
+
+        String expiredEmail = "expired-" + UUID.randomUUID() + "@test.invalid";
+        var expiredInvite = request("POST", "/api/onboarding/invitations", objectMapper.writeValueAsString(java.util.Map.of(
+                "email", expiredEmail, "role", "FRONT_DESK", "branchId", branch)), null, "http://localhost:5173", "Bearer " + ownerAccess);
+        var expired = objectMapper.readTree(expiredInvite.body());
+        UUID expiredId = UUID.fromString(expired.get("id").asText());
+        TenantContext.runAs(clinicId, () -> jdbc.update("UPDATE staff_invitation SET expires_at=now()-interval '1 minute' WHERE id=?", expiredId));
+        assertThat(request("POST", "/api/onboarding/accept", objectMapper.writeValueAsString(java.util.Map.of(
+                "googleIdToken", validToken(expiredEmail), "token", expired.get("token").asText(), "fullName", "Synthetic Staff")),
+                null, "http://localhost:5173", null).statusCode()).isEqualTo(403);
+    }
+
+    @Test void simultaneousHttpInvitationClaimsCreateExactlyOneStaffAccount() throws Exception {
+        String staffEmail = "parallel-" + UUID.randomUUID() + "@test.invalid";
+        String ownerAccess = objectMapper.readTree(login(slug, validToken(email()), "http://localhost:5173").body()).get("accessToken").asText();
+        UUID branch = TenantContext.callAs(clinicId, () -> jdbc.queryForObject("SELECT id FROM branch WHERE clinic_id=? LIMIT 1", UUID.class, clinicId));
+        var issued = request("POST", "/api/onboarding/invitations", objectMapper.writeValueAsString(java.util.Map.of(
+                "email", staffEmail, "role", "DENTIST", "branchId", branch)), null, "http://localhost:5173", "Bearer " + ownerAccess);
+        String token = objectMapper.readTree(issued.body()).get("token").asText();
+        String body = objectMapper.writeValueAsString(java.util.Map.of(
+                "googleIdToken", validToken(staffEmail), "token", token, "fullName", "Synthetic Parallel Dentist"));
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<HttpResponse<String>> first = pool.submit(() -> request("POST", "/api/onboarding/accept", body, null, "http://localhost:5173", null));
+            Future<HttpResponse<String>> second = pool.submit(() -> request("POST", "/api/onboarding/accept", body, null, "http://localhost:5173", null));
+            var statuses = java.util.List.of(first.get(20, TimeUnit.SECONDS).statusCode(), second.get(20, TimeUnit.SECONDS).statusCode());
+            assertThat(statuses).containsExactlyInAnyOrder(200, 403);
+            TenantContext.runAs(clinicId, () -> {
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE lower(email)=?", Integer.class, staffEmail)).isEqualTo(1);
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_invitation WHERE token_hash IS NOT NULL AND email=? AND accepted_at IS NOT NULL", Integer.class, staffEmail)).isEqualTo(1);
+            });
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test void authenticatedPlatformAdminCanReadDirectoryButCannotAccessClinicRecords() throws Exception {
+        var allowed = request("POST", "/api/auth/platform-admin/google", objectMapper.writeValueAsString(
+                java.util.Map.of("idToken", validToken("platform-admin@test.invalid"))), null, "http://localhost:5173", null);
+        assertThat(allowed.statusCode()).isEqualTo(200);
+        String access = objectMapper.readTree(allowed.body()).get("accessToken").asText();
+        var directory = request("GET", "/api/platform-admin/clinics", null, null, null, "Bearer " + access);
+        assertThat(directory.statusCode()).isEqualTo(200);
+        assertThat(directory.body()).contains(slug, otherSlug, "DIRECTORY_ONLY").doesNotContain("Patient A", "Patient B", "A-" + slug, "B-" + otherSlug);
+        assertThat(request("GET", "/api/clinic-management/clinic", null, null, null, "Bearer " + access).statusCode()).isEqualTo(403);
+
+        var denied = request("POST", "/api/auth/platform-admin/google", objectMapper.writeValueAsString(
+                java.util.Map.of("idToken", validToken("not-allowlisted-" + UUID.randomUUID() + "@test.invalid"))), null, "http://localhost:5173", null);
+        assertThat(denied.statusCode()).isEqualTo(403);
+        String[] parts = access.split("\\.");
+        parts[1] = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                objectMapper.writeValueAsBytes(java.util.Map.of("sub", UUID.randomUUID().toString(), "role", "OWNER", "clinic_id", otherClinicId.toString(), "iss", "dental-clinic-saas", "iat", Instant.now().getEpochSecond(), "exp", Instant.now().plusSeconds(300).getEpochSecond())));
+        assertThat(request("GET", "/api/platform-admin/clinics", null, null, null, "Bearer " + String.join(".", parts)).statusCode()).isEqualTo(401);
     }
 
     @Test void applicationRoleCannotReadWriteDeleteOrLinkOtherClinicRecords() {

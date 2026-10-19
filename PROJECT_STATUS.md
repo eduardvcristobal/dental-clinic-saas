@@ -230,3 +230,40 @@ Finish M1 acceptance: authorize and run a real Google sign-in smoke check, then 
 - M1 remains open. Do not proceed to M2 or use real patient records.
 
 Final gate checklist: [docs/M1_4_ACCEPTANCE_CHECKLIST.md](docs/M1_4_ACCEPTANCE_CHECKLIST.md).
+
+## M1.4.1 final acceptance closure attempt (2026-10-19)
+
+**Status: M1 remains OPEN.** Automated server and database gates pass locally. Live provider sign-in, hosted CI, complete browser E2E, and current dependency advisory review are not certified.
+
+- [x] Fixed Google Identity Services initialization to initialize once per client/page, while switching between clinic and Platform Admin screens, and added remount/callback unit coverage.
+- [x] Removed the two React lint warnings in `StaffOnboarding.tsx`.
+- [x] Extended HTTP integration coverage for owner/invitation/dentist/audit lifecycle, invitation replay/expiry/revocation, concurrent claims, and Platform Admin directory-only authorization.
+- [x] Fresh isolated PostgreSQL V1–V14 migration and V13→V14 upgrade passed; restricted-role checks remained green. Existing `dental` DB was not touched.
+- [x] Backend 30/30; frontend 17/17; TypeScript/Vite production build and Oxlint passed with no warnings.
+- [ ] Playwright suite authored but not certified: the local browser runner did not receive the synthetic Google client ID and remained on the missing-configuration page; responsive route assertions and screenshots therefore did not pass. No screenshot evidence is claimed.
+- [ ] Real Google account/browser sign-in remains unverified; no owner account session was exercised and no Google credential was simulated as genuine.
+- [ ] Hosted CI remains unrun: no Git remote is configured and the owner previously deferred the GitHub Actions workflow.
+- [ ] Current npm audit was blocked by DNS failure to `registry.npmjs.org`; prior audit before adding Playwright reported 0 findings. OWASP Maven dependency-check was interrupted while downloading the 409,883-record NVD catalog. Current dependency risk is unverified.
+
+M1.4.1 successful automated totals: **47 passed, 0 failed, 0 skipped** (30 backend + 17 frontend unit tests). The failed Playwright browser run is tracked separately as **0 passed, 3 failed**; these failures are harness/configuration failures and do not represent live Google or backend authentication. No hosted CI run, no actual Google sign-in, and no browser screenshots. **Blocked certification gates: live Google account/sign-in, complete responsive browser suite/evidence, hosted CI, current dependency scans. Do not start M2 or use real patient data.**
+
+See the detailed certification, browser and security results in `docs/M1_4_1_FINAL_CERTIFICATION_REPORT.md`, `docs/M1_4_1_E2E_RESULTS.md`, and `docs/M1_4_1_SECURITY_RESULTS.md`.
+
+## M1.4.2 blocker resolution (2026-10-19, later)
+
+**Status: M1 remains OPEN** — but the browser, responsive-layout, frontend-dependency gates moved from BLOCKED to PASS, and the earlier browser-failure diagnosis was corrected.
+
+- [x] Playwright blocker root-caused (two real defects, neither was the previously suspected env/port issue): (1) the `**/api/**` route glob intercepted Vite's own `/src/api/*` modules and served them JSON, blanking the app; (2) `slugFromHost('127.0.0.1')` returned the clinic slug `'127'`, hiding the clinic-code input. Both fixed; the loopback/IP-literal fix is covered by 7 new unit tests in `frontend/src/lib/tenant.test.ts`.
+- [x] Browser suite green: **3/3 passed in two consecutive runs**, with responsive coverage (12 route/role combos × desktop/tablet/mobile, horizontal-overflow assertions), 4 screenshots and 3 passing-run traces saved under `docs/evidence/m1_4_1/`.
+- [x] Playwright config made deterministic: bundled Chromium (no machine-specific Chrome path), `trace: 'on'`, failure screenshot/video, and a fixed-port `webServer` (`127.0.0.1:5174`, `--strictPort`, fresh start with the synthetic client ID).
+- [x] Product fixes surfaced by the suite: mobile grid blow-out (`.ws-columns>*{min-width:0}`; document was 606 px in a 390 px viewport), `signOut` now clears the local session even if the Google script call fails, logout/refresh fixture cookie semantics, single-credential GSI double (no double sign-in race).
+- [x] npm audit re-run with registry access: **0 vulnerabilities** (all severities zero) on the current tree including Playwright.
+- [x] Backend re-run on a fresh disposable PostgreSQL cluster: **30/30, 0 skipped** — the migration/RLS gate (`MigrationAndTenantIsolationTest`) ran this time; reproduced after recreating both test databases.
+- [x] GitHub Actions workflow extended (browser job with evidence upload; opt-in OWASP job gated on an `NVD_API_KEY` secret) and YAML-validated.
+- [ ] Real Google sign-in and invitation acceptance with authorized test accounts: still blocked — no OAuth client ID, `frontend/.env`, authorized-origin access or test accounts exist in this environment. Exact requirements listed in the certification report.
+- [ ] OWASP dependency-check: NVD catalog (409,901 records) still not downloadable anonymously in the available window; no Maven vulnerability count claimed. Opt-in CI job is ready for when an `NVD_API_KEY` exists.
+- [ ] Hosted CI: still unrun — no Git remote is configured; nothing was pushed.
+
+M1.4.2 totals: **57 passed, 0 failed, 0 skipped** (30 backend + 24 frontend + 3 browser). **Still-open gates: live Google sign-in, OWASP NVD scan, hosted CI. Do not start M2 or use real patient data.**
+
+See the detailed certification, browser and security results in `docs/M1_4_1_FINAL_CERTIFICATION_REPORT.md`, `docs/M1_4_1_E2E_RESULTS.md`, and `docs/M1_4_1_SECURITY_RESULTS.md`.
