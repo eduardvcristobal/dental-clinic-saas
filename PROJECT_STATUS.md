@@ -228,3 +228,5 @@ Finish M1 acceptance: authorize and run a real Google sign-in smoke check, then 
 - V14 left no `platform_admin_access` policy; `dental_app` could not view patient or app_user rows with the platform-admin GUC set. Synthetic upgrade patient remained present for its clinic.
 - Browser smoke verified the registration form and HTTP disabled-registration/API authorization boundaries. Full real Google and onboarding E2E, responsive screenshot files, hosted CI, and dependency advisory scan remain unverified.
 - M1 remains open. Do not proceed to M2 or use real patient records.
+
+Final gate checklist: [docs/M1_4_ACCEPTANCE_CHECKLIST.md](docs/M1_4_ACCEPTANCE_CHECKLIST.md).
