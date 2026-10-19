@@ -1,6 +1,6 @@
 # M1.4.4 — NVD Deferral & Final Acceptance Reconciliation
 
-**Date:** 2026-10-19  
+**Date:** 2026-10-19 (reconciled after owner response)  
 **Decision:** **M1 remains OPEN. M2 is not started. The application is not production-ready.**
 
 ## NVD / Maven dependency assessment
@@ -53,8 +53,8 @@ The existing M1.4.2 browser suite used synthetic credentials and intercepted net
 - M1.4.4 source/preflight change: **1 preflight command passed**, shell syntax passed, whitespace/diff check passed.
 - Product test suites were not rerun during this documentation/preflight reconciliation.
 - Prior M1.4.2 reports record **30 backend + 24 frontend + 3 Playwright = 57 passed, 0 failed, 0 skipped**. These are historical recorded results, not M1.4.4 executions.
-- Real Google flow: **attempted against the live Google Identity UI; unallowlisted account correctly denied; owner login pending user password/MFA handoff**.
-- Invitation acceptance/staff access: **not run; invitee address spelling does not match the available Google account**.
+- Real Google flow: **attempted against live Google Identity UI; unallowlisted account correctly denied; owner completed the requested sign-in handoff, but app authentication could not be verified because no authenticated app state was visible and local ports were unreachable**.
+- Invitation acceptance/staff access: **not run; intended invitee confirmed as `smitycristobal@gmail.com`; no invitation was issued**.
 - Hosted CI run `39232339581`: **verified successful** (backend 30, frontend 24, browser pass, security pass; OWASP skipped by deferral).
 - Maven NVD scan: **deferred exception**, not a passed or failed scan.
 
