@@ -19,8 +19,7 @@ The browser, responsive-layout and frontend-dependency gates that were previousl
 | Platform Admin authorization | PASS (HTTP + browser) | Directory-only data, clinical API denied; browser asserts no patient/clinical text on the admin screen |
 | npm dependency advisory review | **PASS (was BLOCKED)** | `npm audit` on the current tree: 0 vulnerabilities (0 info/low/moderate/high/critical) |
 | OWASP dependency scan | OPEN | NVD catalog download (409,901 records) again incomplete without an API key; opt-in CI job added for when `NVD_API_KEY` exists |
-| Real Google sign-in | BLOCKED | No live flow performed. No configured OAuth client ID, `frontend/.env`, authorized origin access or authorized test accounts exist in this environment. Exact steps below. |
-| Hosted CI | BLOCKED | `git remote -v` is empty. Workflow extended (browser + opt-in OWASP jobs) and YAML-validated; nothing was pushed or run remotely. |
+| Hosted CI | **PASS (was BLOCKED)** | Remote `github.com/eduardvcristobal/dental-clinic-saas` configured; workflow runs green — run 39232339581: java17 (Maven verify, PostgreSQL 16), frontend (build/lint/24 tests), browser (3/3 Playwright), security (gitleaks clean); OWASP job opt-in. Run URL: https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39232339581 |
 
 ## Root cause correction for the earlier browser failures
 

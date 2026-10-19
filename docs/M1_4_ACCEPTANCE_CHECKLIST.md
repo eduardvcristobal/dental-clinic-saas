@@ -17,7 +17,7 @@ Status as of 2026-10-19 (after blocker resolution). **M1 is not complete; do not
 | PostgreSQL RLS | PASS | Forced-RLS table count and cross-clinic denial assertions passed |
 | Platform Admin least privilege | PASS | V14 boundary tests pass; browser asserts directory-only data with no patient/clinical text |
 | Responsive browser regression | **PASS (was BLOCKED)** | 3/3 Playwright tests green twice consecutively; 12 route/role combos × desktop/tablet/mobile with overflow assertions; root causes fixed (API-route glob swallowing `/src/api/*` modules; loopback host treated as clinic slug). Screenshots + traces in `docs/evidence/m1_4_1/` |
-| CI quality gates | PARTIAL | Workflow extended (browser evidence upload + opt-in OWASP job) and YAML-validated; hosted Actions not run — no Git remote configured |
+| CI quality gates | **PASS (was PARTIAL)** | Hosted run green on `main` (run 39232339581): java17 (Maven verify + PostgreSQL 16), frontend, browser 3/3, gitleaks clean; OWASP job opt-in pending `NVD_API_KEY` |
 | Updated documentation and tracker | PASS | README, setup docs, reports and `PROJECT_STATUS.md` updated |
 | No unresolved critical/high security vulnerabilities | PARTIAL | npm audit current: 0 vulnerabilities (all severities). OWASP Maven scan still incomplete without an NVD API key; opt-in CI job ready |
 
