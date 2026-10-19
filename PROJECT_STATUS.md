@@ -162,3 +162,21 @@ Complete a live Google sign-in smoke check at `/platform-admin/login` (after con
 - [ ] Resolve M0.4 Platform Admin cross-tenant privilege and CI/Google provider tests before real clinical data.
 
 See `docs/M1_CLINIC_MANAGEMENT_REPORT.md`. No M1 completion or production-ready claim.
+
+## M1.2 — Secure clinic onboarding, staff invitations & dentist profiles (2026-10-19)
+
+**Status: IMPLEMENTED, NOT VERIFIED; production rollout blocked.**
+
+- [x] V13 invitation and admin event tables, same-clinic FK constraints and RLS, unique dentist/user association.
+- [x] Google-verified initial owner and first-branch creation endpoint; public self-registration **disabled by default**.
+- [x] Owner/Admin invitation creation, one-time token disclosure, tenant-scoped listing and revocation.
+- [x] Google-verified invitation acceptance bound to recipient email with row-level locking and one-time acceptance.
+- [x] Existing-staff dentist registration with in-clinic user validation and admin event records.
+- [x] Staff management UI for invitation issuance/revocation and dentist profile creation.
+- [x] Negative-path unit tests authored.
+- [ ] Java 17 compilation/Maven unit and integration tests (environment missing JDK 17/Maven).
+- [ ] PostgreSQL V1–V13 migration, restricted-role cross-tenant and replay/concurrency tests.
+- [ ] Actual frontend build, lint, browser checks and public invitation acceptance/clinic signup UI.
+- [ ] Email invitation delivery, hosted CI, deployment rate limits and outstanding Platform Admin privilege review.
+
+See `docs/M1_2_ONBOARDING_REPORT.md`. Do not treat M1.2 as fully tested or safe for clinical production until M1.3 is complete.

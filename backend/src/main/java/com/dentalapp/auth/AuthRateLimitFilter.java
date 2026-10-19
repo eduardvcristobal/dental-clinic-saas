@@ -46,7 +46,7 @@ public final class AuthRateLimitFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         int limit;
         if (!"POST".equals(request.getMethod())) { chain.doFilter(request, response); return; }
-        if ("/api/auth/google".equals(path) || "/api/auth/platform-admin/google".equals(path)) limit = loginLimit;
+        if ("/api/auth/google".equals(path) || "/api/auth/platform-admin/google".equals(path) || "/api/onboarding/clinics".equals(path) || "/api/onboarding/accept".equals(path)) limit = loginLimit;
         else if ("/api/auth/refresh".equals(path)) limit = refreshLimit;
         else { chain.doFilter(request, response); return; }
 

@@ -88,6 +88,7 @@ public class AuthSecurity {
           .authorizeHttpRequests(reg -> reg
              .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
              .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+             .requestMatchers("/api/onboarding/clinics", "/api/onboarding/accept").permitAll()
              .requestMatchers("/api/auth/google", "/api/auth/platform-admin/google", "/api/auth/refresh", "/api/auth/logout").permitAll()
              .requestMatchers("/api/platform-admin/**").hasRole("PLATFORM_ADMIN")
              .anyRequest().authenticated())
