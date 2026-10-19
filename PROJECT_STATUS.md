@@ -337,3 +337,20 @@ See [M1.4.5 final certification report](docs/M1_4_5_FINAL_CERTIFICATION_REPORT.m
 Disposable test database `dental_m146_e2e` contains only test clinic/onboarding data and no patient records. M1 is complete for development acceptance. NVD deferral does not confer production security certification; the Maven vulnerability assessment, privacy/security review, operational controls, and production deployment verification remain mandatory before production use.
 
 See [M1.4.6 final acceptance report](docs/M1_4_6_FINAL_ACCEPTANCE_REPORT.md), [live invitation replay evidence](docs/M1_4_6_LIVE_INVITATION_REPLAY.md), [clinic registration E2E](docs/M1_4_6_CLINIC_REGISTRATION_E2E.md), and [hosted CI evidence](docs/M1_4_6_HOSTED_CI_EVIDENCE.md).
+
+## M2.2 — Patient medical history, guardians, consent & identity review (2026-10-19)
+
+**Status: IMPLEMENTED / RUNTIME VERIFICATION PENDING.** M1 remains accepted for development. Synthetic test patients only; production use is not authorized.
+
+- [x] Forward-only V15 migration adds clinic-scoped guardian contacts, one medical history per patient, explicit `UNSIGNED`/`ACKNOWLEDGED` consent tracking, and RLS.
+- [x] Clinic-scoped medical history read/write endpoints restricted to OWNER, ADMIN, and DENTIST, with audit events.
+- [x] Patient guardian contact add/list/remove endpoints, primary guardian index, and audit events.
+- [x] Unsigned consent request and administrative acknowledgement endpoints; acknowledgement explicitly **does not represent informed consent or signature**.
+- [x] Clinic-scoped exact-name/DOB identity review endpoint, advisory only, with no automatic merge.
+- [x] Patient Registry embeds M2.2 patient-specific tabs/panels; clinical history hidden from Front Desk.
+- [x] Security-oriented controller tests authored.
+- [ ] Java 17 Maven unit/integration tests and PostgreSQL V1–V15 migration/RLS validation not executed here.
+- [ ] Frontend `npm ci`, TypeScript build, lint, Vitest and browser E2E not executed here.
+- [ ] Real signature capture, guardian authority verification, signed consent storage, patient merge/identity reconciliation and full clinical workflows remain out of scope.
+
+See `docs/M2_2_DELIVERY_REPORT.md`. NVD scan remains deferred to M10 and remains a production gate.
