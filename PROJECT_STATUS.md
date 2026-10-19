@@ -18,11 +18,11 @@
 
 | ID | Milestone | Status | Acceptance gate |
 |---|---|---|---|
-| M0 | Foundation audit & setup | **In progress — M0.4 local validation passed; CI/provider checks open** | Java 17, local PG migration/RLS/auth tests, frontend checks passed; hosted CI and browser/provider verification pending |
+| M0 | Foundation audit & setup | **In progress — local validation and hosted CI passed; live provider check open** | Java 17, local PG migration/RLS/auth tests, frontend checks and hosted workflow passed; real browser/provider verification remains pending |
 | M0.5 | Role-specific application shell & connected UI previews | Implemented — review/verification pending | Responsive navigation, safe demo state, role-based previews, tests |
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
-| M1 | Clinics, branches, dentists, chairs, staff | **IN PROGRESS — M1.4 local regression partial; certification gates remain** | Complete tenant/branch onboarding, permissions, browser E2E, security and CI gates |
+| M1 | Clinics, branches, dentists, chairs, staff | **IN PROGRESS — hosted CI verified; live Google invitation E2E remains open** | Complete tenant/branch onboarding, permissions, real-account browser E2E, security and CI gates |
 | M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
 | M4 | Odontogram | Not started | Adult/primary tooth surfaces, statuses, historical entries |
@@ -63,7 +63,7 @@
 
 ### M0.4.7 — CI/CD quality gates
 - [x] Workflow authored for Java 17, PostgreSQL 16, Maven verify, frontend typecheck/lint/test/build, Gitleaks and dependency review.
-- [ ] GitHub Actions has not executed; workflow result and external scan availability remain unverified.
+- [x] Hosted GitHub Actions run `39232339581` passed the Java/PostgreSQL, frontend, synthetic browser, and Gitleaks jobs. The optional OWASP job was skipped under the accepted deferral; see `docs/M1_4_HOSTED_CI_EVIDENCE.md`.
 
 ### M0.4.8 — Documentation and delivery
 - [x] Setup docs, environment examples and three validation reports updated with executed results and remaining risks.
@@ -90,8 +90,8 @@
 | 2026-10-19 | Restricted-role RLS and same-clinic constraints | **Passed:** no BYPASSRLS/superuser; read/update/delete/spoof, pool reset and FK denial checks passed |
 | 2026-10-19 | `npm ci` | **Passed:** locked dependencies installed; 0 npm audit vulnerabilities |
 | 2026-10-19 | `npm test && npm run build && npm run lint` | **Passed:** 3 tests, TypeScript/Vite build and lint with no warnings |
-| 2026-10-19 | GitHub Actions | **Not run:** no workflow execution available from this workspace |
-| 2026-10-19 | Live Google/browser UI | **Not verified:** controlled signed-token HTTP integration passed; no live provider/browser account used |
+| 2026-10-19 | GitHub Actions run 39232339581 | **Passed:** exact SHA `2791a1c578f19174ea609b53ad84ed656fc9faf9`; backend 30/30, frontend 24/24, browser and security jobs passed; OWASP skipped by deferral |
+| 2026-10-19 | Live Google/browser UI | **Partial / blocked:** live Google chooser returned an unallowlisted account which was denied; owner sign-in reached the password challenge and awaits owner handoff; no invite issued |
 
 Detailed evidence: [runtime report](docs/M0_4_RUNTIME_VALIDATION_REPORT.md), [database report](docs/M0_4_DATABASE_VALIDATION_REPORT.md), [security report](docs/M0_4_SECURITY_REGRESSION_REPORT.md).
 
@@ -264,7 +264,7 @@ See the detailed certification, browser and security results in `docs/M1_4_1_FIN
 - [ ] OWASP dependency-check: NVD catalog (409,901 records) still not downloadable anonymously in the available window; no Maven vulnerability count claimed. Opt-in CI job is ready for when an `NVD_API_KEY` exists.
 - [ ] Hosted CI at this M1.4.2 checkpoint: still unrun — no Git remote was configured at that checkpoint; nothing was pushed.
 
-M1.4.2 totals: **57 passed, 0 failed, 0 skipped** (30 backend + 24 frontend + 3 browser), as recorded at that checkpoint. The Maven NVD scan was incomplete then and was formally deferred in M1.4.4; it remains a production security gate. **Still-open M1 gates include live Google sign-in/invitation acceptance and verified hosted CI evidence. Do not start M2 or use real patient data.**
+M1.4.2 totals: **57 passed, 0 failed, 0 skipped** (30 backend + 24 frontend + 3 browser), as recorded at that checkpoint. The Maven NVD scan was incomplete then and was formally deferred in M1.4.4; it remains a production security gate. At that checkpoint, hosted CI evidence was also outstanding; run `39232339581` has since been verified. **The live Google sign-in/invitation acceptance gate remains open. Do not start M2 or use real patient data.**
 
 See the detailed certification, browser and security results in `docs/M1_4_1_FINAL_CERTIFICATION_REPORT.md`, `docs/M1_4_1_E2E_RESULTS.md`, and `docs/M1_4_1_SECURITY_RESULTS.md`.
 
@@ -288,10 +288,18 @@ See `docs/M1_4_3_EXTERNAL_CERTIFICATION_REPORT.md`. Previous M1.4.2 reports reco
 - [x] Owner accepted deferral of the OWASP Maven/NVD scan to M10 — Production Security Hardening. Status is **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION**, never PASS. Maven dependency exposure is unassessed; a completed Maven vulnerability assessment and disposition of applicable findings is required before production deployment.
 - [x] Kept the optional `owasp` GitHub Actions job and all existing test/security jobs, dependency review, and secret scanning unchanged.
 - [x] Updated `scripts/m1_4_3_preflight.sh`: absent `NVD_API_KEY` emits an advisory and does not set the preflight failure flag. Other prerequisites still determine the exit result.
-- [x] Reconciled run 39232339581: commit `07cc18f` and the checklist assert a green run, but no primary run record, job logs, artifact, or exact head SHA is available locally. `gh auth status` reports an invalid credential; GitHub API access and `git ls-remote` failed due unavailable network/DNS; unauthenticated run URL returned 404. Current `origin` is configured. CI status is **NOT VERIFIED**, not PASS.
-- [ ] Real Google sign-in and staff invitation acceptance with two authorized accounts in an isolated clinic: pending recipient account address/session and an executable local OAuth/browser setup. No authentication token or credential was logged or recorded.
-- [ ] Hosted CI: obtain authenticated run record/logs for 39232339581 or run CI again with evidence capture.
+- [x] Reconciled run 39232339581 from the authenticated GitHub Actions page: push to `main`, exact SHA `2791a1c578f19174ea609b53ad84ed656fc9faf9`; `java17`, `frontend`, `browser`, and `security` succeeded; `owasp` skipped by its optional condition. Backend 30/30, frontend 24/24, synthetic Playwright suite passed, and Gitleaks reported no leaks. See `docs/M1_4_HOSTED_CI_EVIDENCE.md` for job IDs, artifacts, and digests.
+- [ ] Real Google sign-in and staff invitation acceptance in an isolated clinic: owner and recipient identities supplied. A disposable database migrated to V14 and the app is running on Java 17. Google initially offered an account not on the Platform Admin allowlist, which the app correctly denied; owner login reached the Google password challenge, where work was handed back to the owner. The supplied recipient identity differs by spelling from the currently available Google identity, so no invite has been issued. No identity token or password was logged or saved.
+- [x] Hosted CI run evidence reconciled; it verifies SHA `2791a1c…`, not the current local checkout. The local GitHub CLI token still reports invalid, but the authenticated browser session exposed the run record and evidence.
 
-M1.4.2's recorded local suite totals remain 30 backend + 24 frontend + 3 browser = **57 passed**; these are prior-run records and were not rerun for M1.4.4. Real provider/invitation verification and hosted CI evidence remain open. The NVD scan is deferred by an owner-accepted exception and is a production blocker, not an M1 development preflight blocker. Keep M1 open; do not start M2 or use real patient data.
+M1.4.2's recorded local suite totals remain 30 backend + 24 frontend + 3 browser = **57 passed**; these are prior-run records and were not rerun for M1.4.4. Hosted CI evidence is now verified; real provider/invitation verification remains open. The NVD scan is deferred by an owner-accepted exception and remains a production blocker, not an M1 development preflight blocker. Keep M1 open; do not start M2 or use real patient data.
 
 See [M1.4.4 final acceptance report](docs/M1_4_4_FINAL_ACCEPTANCE_REPORT.md), [reconciled checklist](docs/M1_4_ACCEPTANCE_CHECKLIST.md), and [M1.4.3 evidence handoff](docs/M1_4_3_EXTERNAL_CERTIFICATION_REPORT.md).
+
+## M1.4.5 — Hosted CI evidence and live OAuth follow-up (2026-10-19)
+
+- [x] Confirmed the previously disputed hosted run `39232339581` in the signed-in GitHub web session: overall success on `main`, SHA `2791a1c578f19174ea609b53ad84ed656fc9faf9`; Java/PostgreSQL, frontend, browser and security jobs succeeded; optional OWASP was skipped. Backend 30 tests and frontend 24 tests passed; browser E2E succeeded with synthetic Google credentials. Gitleaks found no leaks. Dependency Review did not execute on this push event because it is PR-only.
+- [x] Saved job conclusions and artifact digests in `docs/M1_4_HOSTED_CI_EVIDENCE.md`; updated the M1 acceptance checklist and M1.4.4 reconciliation report.
+- [ ] Actual Google OAuth and invitation acceptance remain blocked on owner completing password/MFA and confirming the invitee identity. The disposable database `dental_m144_oauth` is migrated through V14, and the app is running on Java 17. The available Google identity differs from the supplied invitee identity; no invitation has been issued. No token or password was logged or saved.
+
+M1 remains open, M2 has not started, and the product is not production-ready. The M10 Maven vulnerability assessment remains required before production deployment.

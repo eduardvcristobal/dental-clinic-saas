@@ -33,18 +33,18 @@ There is a material record conflict. Commit `07cc18f` and the acceptance checkli
 Read-only verification attempts:
 
 - `git remote -v`: `origin` is configured as `https://github.com/eduardvcristobal/dental-clinic-saas.git`; branch `main` points to `07cc18f` and tracks `origin/main` locally.
-- `gh auth status`: local GitHub credential is invalid.
-- `gh run view 39232339581 --repo eduardvcristobal/dental-clinic-saas --json databaseId,headSha,headBranch,status,conclusion,event,createdAt,updatedAt,jobs,url`: GitHub API connection unavailable.
-- `curl --fail --silent --show-error --location https://api.github.com/repos/eduardvcristobal/dental-clinic-saas/actions/runs/39232339581`: HTTP 404 without authenticated access.
-- `git ls-remote origin HEAD refs/heads/main`: failed because `github.com` did not resolve in the shell environment.
+- `gh auth status` still reports the local CLI credential as invalid even after the browser device-flow page confirmed connection.
+- GitHub API and `git ls-remote` attempts from the shell remained unavailable; the run metadata and conclusions were therefore captured from the authenticated browser session instead.
 
-**Disposition: NOT VERIFIED.** The documentation commit establishes that a green run was reported, but not that the run exists, which SHA it tested, which jobs completed, or their actual test totals. The previous checklist PASS has been corrected. No hosted run was started during M1.4.4.
+**Disposition: VERIFIED — PASS for required hosted CI jobs.** The earlier report recorded a not-verified status because shell/API access was unavailable. On 2026-10-19, the run page was inspected in the already authenticated GitHub browser session. Run `39232339581` exists, ran on `main` at SHA `2791a1c578f19174ea609b53ad84ed656fc9faf9`, and completed successfully. `java17`, `frontend`, `browser`, and `security` all succeeded; optional `owasp` was skipped under its condition. Backend reported 30 tests with no failures/errors/skips; frontend reported 24 tests across 6 files; the synthetic Playwright job succeeded. Gitleaks reported no leaks. Dependency Review did not run because this was a push event and that step is PR-only. Artifact digests and job evidence are captured in [M1 hosted CI evidence](M1_4_HOSTED_CI_EVIDENCE.md). This resolves the run conflict, but the run SHA is not the current local HEAD and CI does not substitute for the live Google account flow.
 
-To close this item, obtain the run page/API response and job logs/artifact manifest through an authenticated GitHub session, or run the workflow again and record the exact run ID, tested SHA, all job conclusions, and artifact checksums.
+This item is closed as hosted CI evidence. The independent local GitHub CLI credential mismatch remains an environment issue only; it does not invalidate the run page evidence.
 
 ## Live Google sign-in and invitation acceptance
 
-**Status: NOT COMPLETED.** No real Google token, account password, or identity credential was logged or saved. The required second authorized recipient's email has not yet been supplied in the active session. Local app ports 5173/5174/8080 were not running, and repository-local `.env.local`/OAuth configuration files were absent at inspection. Without the recipient address and a functioning configured OAuth/browser session, the real invite cannot be issued and accepted truthfully.
+**Status: BLOCKED — manual account sign-in and recipient identity confirmation remain.** The owner supplied separate clinic OWNER and invitation recipient identities. A disposable database, `dental_m144_oauth`, has been created locally; migrations V1–V14 completed and the app starts on Java 17 with a non-superuser/non-BYPASSRLS app role. Local-only OAuth settings are ignored by Git. No identity token or password was logged or saved.
+
+The real Google sign-in UI was exercised. The chooser initially offered an account not on the Platform Admin allowlist; its live sign-in was correctly denied. I then entered the owner email supplied by the user and Google reached the password challenge. I stopped there for the owner to complete password/MFA in Chrome. The invitee address supplied by the user differs from the currently available Google identity by a spelling variation; the exact recipient identity must be confirmed before invitation issuance or acceptance. No invitation was issued, so staff access has not been verified.
 
 The existing M1.4.2 browser suite used synthetic credentials and intercepted network calls; it is not evidence of real Google authentication or real invitation acceptance. The live test remains required for M1 closure.
 
@@ -53,10 +53,11 @@ The existing M1.4.2 browser suite used synthetic credentials and intercepted net
 - M1.4.4 source/preflight change: **1 preflight command passed**, shell syntax passed, whitespace/diff check passed.
 - Product test suites were not rerun during this documentation/preflight reconciliation.
 - Prior M1.4.2 reports record **30 backend + 24 frontend + 3 Playwright = 57 passed, 0 failed, 0 skipped**. These are historical recorded results, not M1.4.4 executions.
-- Real Google/invitation flow: **not run**.
-- Hosted CI: **not verified** (reported run unconfirmed).
+- Real Google flow: **attempted against the live Google Identity UI; unallowlisted account correctly denied; owner login pending user password/MFA handoff**.
+- Invitation acceptance/staff access: **not run; invitee address spelling does not match the available Google account**.
+- Hosted CI run `39232339581`: **verified successful** (backend 30, frontend 24, browser pass, security pass; OWASP skipped by deferral).
 - Maven NVD scan: **deferred exception**, not a passed or failed scan.
 
 ## Acceptance decision and next steps
 
-Keep M1 OPEN and M2 blocked until live Google login plus staff invitation acceptance are verified with authorized test accounts in an isolated clinic, and the hosted CI record is independently confirmed or rerun with preserved evidence. NVD deferral is accepted for development only; complete the Maven vulnerability assessment and finding disposition before production deployment. Do not describe the application as production-ready.
+Keep M1 OPEN and M2 blocked until live Google login plus staff invitation acceptance are verified with authorized test accounts in an isolated clinic. Hosted run `39232339581` is now independently confirmed with preserved metadata and job evidence. NVD deferral is accepted for development only; complete the Maven vulnerability assessment and finding disposition before production deployment. Do not describe the application as production-ready.
