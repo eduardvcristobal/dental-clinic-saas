@@ -8,6 +8,9 @@ Google sign-in (Google Identity Services via `@react-oauth/google`), multi-tenan
 2. `cp .env.example .env` and set `VITE_GOOGLE_CLIENT_ID`.
 3. `npm install && npm run dev` (the backend is expected on `localhost:8080`; `/api` is proxied).
 
+Run the frontend checks with `npm ci && npm test && npm run build && npm run lint`.
+Vitest covers concurrent refresh coalescing, restoration after a 401, and session expiry handling.
+
 ## How sign-in works
 1. User enters a clinic code (or it comes from the subdomain) and clicks the Google button.
 2. Google returns an ID token to the browser. The frontend sends `{ clinicSlug, idToken }` to `POST /api/auth/google`.
@@ -15,7 +18,7 @@ Google sign-in (Google Identity Services via `@react-oauth/google`), multi-tenan
    (short-lived access token in the JSON body) and sets an httpOnly refresh cookie.
 4. The access token is kept in memory only. On reload the app calls `POST /api/auth/refresh` to restore the session.
 
-The backend endpoints in `src/api/auth.ts` still need to be implemented.
+The backend auth endpoints live in `backend/src/main/java/com/dentalapp/auth`.
 
 ## Structure
 ```

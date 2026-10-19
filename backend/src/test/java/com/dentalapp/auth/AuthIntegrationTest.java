@@ -1,0 +1,285 @@
+package com.dentalapp.auth;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.dentalapp.tenancy.TenantContext;
+import com.nimbusds.jose.JOSEObjectType;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.sql.DriverManager;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import java.sql.Connection;
+
+/** Runs against an explicitly supplied disposable PostgreSQL database (M04_AUTH_TEST_DB_URL). */
+@EnabledIfEnvironmentVariable(named = "M04_AUTH_TEST_DB_URL", matches = ".+")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class AuthIntegrationTest {
+    private static final String CLIENT_ID = "m04-test-client";
+    private static final RSAKey SIGNING_KEY;
+    private static final HttpServer JWKS_SERVER;
+
+    static {
+        try {
+            SIGNING_KEY = new RSAKeyGenerator(2048).keyID("m04-test-key").generate();
+            JWKS_SERVER = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            JWKS_SERVER.createContext("/keys", exchange -> {
+                byte[] body = ("{\"keys\":[" + SIGNING_KEY.toPublicJWK().toJSONString() + "]}").getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, body.length);
+                try (var out = exchange.getResponseBody()) { out.write(body); }
+            });
+            JWKS_SERVER.start();
+        } catch (Exception e) { throw new ExceptionInInitializerError(e); }
+    }
+
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry properties) {
+        String url = System.getenv("M04_AUTH_TEST_DB_URL");
+        String owner = System.getenv().getOrDefault("M04_AUTH_TEST_OWNER_USER", "postgres");
+        String ownerPassword = System.getenv("M04_AUTH_TEST_OWNER_PASSWORD");
+        String appPassword = System.getenv("M04_AUTH_TEST_APP_PASSWORD");
+        try (var connection = DriverManager.getConnection(url, owner, ownerPassword);
+             var statement = connection.createStatement()) {
+            try (var roles = statement.executeQuery("SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname='dental_app'")) {
+                if (!roles.next()) {
+                    statement.execute("CREATE ROLE dental_app LOGIN PASSWORD '" + appPassword.replace("'", "''") + "' NOSUPERUSER NOBYPASSRLS");
+                } else if (roles.getBoolean(1) || roles.getBoolean(2)) {
+                    throw new IllegalStateException("dental_app test role must be NOSUPERUSER NOBYPASSRLS");
+                }
+            }
+        } catch (Exception e) { throw new IllegalStateException("Could not provision restricted auth test role", e); }
+        properties.add("spring.datasource.url", () -> System.getenv("M04_AUTH_TEST_DB_URL"));
+        properties.add("spring.datasource.username", () -> System.getenv().getOrDefault("M04_AUTH_TEST_APP_USER", "dental_app"));
+        properties.add("spring.datasource.password", () -> System.getenv("M04_AUTH_TEST_APP_PASSWORD"));
+        properties.add("spring.flyway.url", () -> System.getenv("M04_AUTH_TEST_DB_URL"));
+        properties.add("spring.flyway.user", () -> System.getenv().getOrDefault("M04_AUTH_TEST_OWNER_USER", "postgres"));
+        properties.add("spring.flyway.password", () -> System.getenv("M04_AUTH_TEST_OWNER_PASSWORD"));
+        properties.add("app.auth.google-client-id", () -> CLIENT_ID);
+        properties.add("app.auth.google-jwk-set-uri", () -> "http://127.0.0.1:" + JWKS_SERVER.getAddress().getPort() + "/keys");
+        properties.add("app.auth.jwt-secret", () -> "m04-integration-test-jwt-secret-32-bytes-minimum");
+        properties.add("app.auth.cookie-secure", () -> "false");
+        properties.add("app.auth.allowed-origins", () -> "http://localhost:5173");
+        properties.add("app.auth.login-requests-per-minute", () -> "1000");
+        properties.add("app.auth.refresh-requests-per-minute", () -> "1000");
+    }
+
+    @Autowired JdbcTemplate jdbc;
+    @Autowired ObjectMapper objectMapper;
+    @Autowired DataSource dataSource;
+    private final HttpClient http = HttpClient.newHttpClient();
+    @LocalServerPort int port;
+    UUID clinicId;
+    UUID otherClinicId;
+    UUID activeUserId;
+    UUID otherUserId;
+    UUID otherPatientId;
+    String otherSlug;
+    String slug;
+
+    @AfterAll static void stopJwksServer() { JWKS_SERVER.stop(0); }
+
+    @BeforeEach void createStaffFixture() {
+        clinicId = UUID.randomUUID();
+        slug = "m04-" + clinicId.toString().substring(0, 8);
+        otherClinicId = UUID.randomUUID();
+        otherSlug = "m04-" + otherClinicId.toString().substring(0, 8);
+        jdbc.update("INSERT INTO clinic(id,slug,name) VALUES (?,?,?),(?,?,?)", clinicId, slug, "M04 Auth Clinic", otherClinicId, otherSlug, "M04 Other Clinic");
+        activeUserId = UUID.randomUUID();
+        otherUserId = UUID.randomUUID();
+        otherPatientId = UUID.randomUUID();
+        TenantContext.runAs(clinicId, () -> {
+            jdbc.update("""
+            INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active)
+            VALUES (?,?,?,?,?,'OWNER',true)
+            """, activeUserId, clinicId, email(), "unused", "Active Staff");
+            jdbc.update("""
+            INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active)
+            VALUES (?,?,?,?,?,'FRONT_DESK',false)
+            """, UUID.randomUUID(), clinicId, "inactive-" + slug + "@test.invalid", "unused", "Inactive Staff");
+            jdbc.update("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (?,?,?,?,?)",
+                    UUID.randomUUID(), clinicId, "A-" + slug, "Patient", "A");
+        });
+        TenantContext.runAs(otherClinicId, () -> {
+            jdbc.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VALUES (?,?,?,?,?,'OWNER',true)",
+                    otherUserId, otherClinicId, "other-" + otherSlug + "@test.invalid", "unused", "Other Staff");
+            jdbc.update("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (?,?,?,?,?)",
+                    otherPatientId, otherClinicId, "B-" + otherSlug, "Patient", "B");
+        });
+    }
+
+    private String email() { return "active-" + slug + "@test.invalid"; }
+    private String token(String issuer, String audience, String email, boolean verified, Instant expires, RSAKey key) throws Exception {
+        var claims = new JWTClaimsSet.Builder().issuer(issuer).subject("google-subject-" + UUID.randomUUID())
+                .audience(audience).issueTime(Date.from(Instant.now().minusSeconds(10)))
+                .expirationTime(Date.from(expires)).claim("email", email).claim("email_verified", verified).build();
+        var jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).type(JOSEObjectType.JWT).keyID(key.getKeyID()).build(), claims);
+        jwt.sign(new RSASSASigner(key));
+        return jwt.serialize();
+    }
+    private String validToken(String mail) throws Exception {
+        return token("https://accounts.google.com", CLIENT_ID, mail, true, Instant.now().plusSeconds(300), SIGNING_KEY);
+    }
+    private HttpResponse<String> request(String method, String path, String body, String cookie, String origin, String bearer) {
+        var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        if (origin != null) builder.header("Origin", origin);
+        if (cookie != null) builder.header("Cookie", cookie);
+        if (bearer != null) builder.header("Authorization", bearer);
+        if (body != null) builder.header("Content-Type", "application/json");
+        builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+        try { return http.send(builder.build(), HttpResponse.BodyHandlers.ofString()); }
+        catch (Exception e) { throw new IllegalStateException(e); }
+    }
+    private HttpResponse<String> login(String clinic, String identityToken, String origin) throws Exception {
+        return request("POST", "/api/auth/google", objectMapper.writeValueAsString(java.util.Map.of("clinicSlug", clinic, "idToken", identityToken)), null, origin, null);
+    }
+    private HttpResponse<String> refresh(String cookie) {
+        return request("POST", "/api/auth/refresh", null, "dental_refresh=" + cookie, "http://localhost:5173", null);
+    }
+    private String cookieValue(HttpResponse<?> response) {
+        String setCookie = response.headers().firstValue("Set-Cookie").orElse(null);
+        assertThat(setCookie).isNotNull();
+        String cookie = setCookie.split(";", 2)[0];
+        return cookie.substring(cookie.indexOf('=') + 1);
+    }
+
+    @Test void googleIdentityMatrixAndClinicMembershipAreEnforced() throws Exception {
+        assertThat(login(slug, validToken(email()), "http://localhost:5173").statusCode()).isEqualTo(200);
+        assertThat(login(slug, "not.a.jwt", "http://localhost:5173").statusCode()).isEqualTo(401);
+        assertThat(login(slug, token("https://wrong.invalid", CLIENT_ID, email(), true, Instant.now().plusSeconds(300), SIGNING_KEY), "http://localhost:5173").statusCode()).isEqualTo(401);
+        assertThat(login(slug, token("https://accounts.google.com", "wrong-audience", email(), true, Instant.now().plusSeconds(300), SIGNING_KEY), "http://localhost:5173").statusCode()).isEqualTo(401);
+        assertThat(login(slug, token("https://accounts.google.com", CLIENT_ID, email(), true, Instant.now().minusSeconds(1), SIGNING_KEY), "http://localhost:5173").statusCode()).isEqualTo(401);
+        assertThat(login(slug, token("https://accounts.google.com", CLIENT_ID, email(), false, Instant.now().plusSeconds(300), SIGNING_KEY), "http://localhost:5173").statusCode()).isEqualTo(401);
+        RSAKey other = new RSAKeyGenerator(2048).keyID("wrong-key").generate();
+        assertThat(login(slug, token("https://accounts.google.com", CLIENT_ID, email(), true, Instant.now().plusSeconds(300), other), "http://localhost:5173").statusCode()).isEqualTo(401);
+        assertThat(login(slug, validToken("unknown@test.invalid"), "http://localhost:5173").statusCode()).isEqualTo(403);
+        assertThat(login(slug, validToken("inactive-" + slug + "@test.invalid"), "http://localhost:5173").statusCode()).isEqualTo(403);
+        assertThat(login("unknown-clinic", validToken(email()), "http://localhost:5173").statusCode()).isEqualTo(403);
+        assertThat(login(otherSlug, validToken(email()), "http://localhost:5173").statusCode()).isEqualTo(403);
+        assertThat(login(slug, validToken(email()), "https://evil.invalid").statusCode()).isEqualTo(403);
+    }
+
+    @Test void refreshRotationReplayRevocationCookiesAndLogoutWork() throws Exception {
+        var loggedIn = login(slug, validToken(email()), "http://localhost:5173");
+        assertThat(loggedIn.statusCode()).isEqualTo(200);
+        String firstCookie = cookieValue(loggedIn);
+        String setCookie = loggedIn.headers().firstValue("Set-Cookie").orElseThrow();
+        assertThat(setCookie).contains("HttpOnly", "SameSite=Strict", "Path=/api/auth", "Max-Age=1209600");
+        assertThat(setCookie).doesNotContain("Secure"); // Test profile explicitly disables HTTPS-only cookies.
+
+        var rotated = refresh(firstCookie);
+        assertThat(rotated.statusCode()).isEqualTo(200);
+        String secondCookie = cookieValue(rotated);
+        assertThat(secondCookie).isNotEqualTo(firstCookie);
+        assertThat(refresh(firstCookie).statusCode()).isEqualTo(401);
+        assertThat(refresh(secondCookie).statusCode()).isEqualTo(401); // replay revokes the user's live sessions
+
+        var anotherLogin = login(slug, validToken(email()), "http://localhost:5173");
+        String logoutCookie = cookieValue(anotherLogin);
+        var logout = request("POST", "/api/auth/logout", null, "dental_refresh=" + logoutCookie, "http://localhost:5173", null);
+        assertThat(logout.statusCode()).isEqualTo(204);
+        assertThat(logout.headers().firstValue("Set-Cookie").orElseThrow()).contains("HttpOnly", "SameSite=Strict", "Max-Age=0");
+        assertThat(refresh(logoutCookie).statusCode()).isEqualTo(401);
+    }
+
+    @Test void concurrentRefreshAllowsOneRotationThenRevokesOnReplay() throws Exception {
+        String cookie = cookieValue(login(slug, validToken(email()), "http://localhost:5173"));
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<HttpResponse<String>> first = pool.submit(() -> refresh(cookie));
+            Future<HttpResponse<String>> second = pool.submit(() -> refresh(cookie));
+            int a = first.get(20, TimeUnit.SECONDS).statusCode();
+            int b = second.get(20, TimeUnit.SECONDS).statusCode();
+            assertThat(java.util.List.of(a,b)).containsExactlyInAnyOrder(200,401);
+            String rotatedCookie = a == 200 ? cookieValue(first.get()) : cookieValue(second.get());
+            assertThat(refresh(rotatedCookie).statusCode()).isEqualTo(401);
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test void accessJwtIsAcceptedOnlyWhenSignedAndUnexpiredAndProtectedRoutesRequireIt() throws Exception {
+        var login = login(slug, validToken(email()), "http://localhost:5173");
+        String access = objectMapper.readTree(login.body()).get("accessToken").asText();
+        int authenticatedStatus = request("GET", "/api/not-found", null, null, null, "Bearer " + access).statusCode();
+        assertThat(authenticatedStatus).isEqualTo(404);
+        assertThat(request("GET", "/api/not-found", null, null, null, null).statusCode()).isEqualTo(401);
+        String[] parts = access.split("\\.");
+        char firstSignature = parts[2].charAt(0);
+        parts[2] = (firstSignature == 'a' ? "b" : "a") + parts[2].substring(1);
+        assertThat(request("GET", "/api/not-found", null, null, null, "Bearer " + String.join(".", parts)).statusCode()).isEqualTo(401);
+        String expired = expiredAccessToken();
+        assertThat(request("GET", "/api/not-found", null, null, null, "Bearer " + expired).statusCode()).isEqualTo(401);
+    }
+
+    @Test void pooledConnectionTenantSettingIsClearedBeforeReuse() throws Exception {
+        TenantContext.set(clinicId);
+        try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement();
+             var result = statement.executeQuery("SELECT count(*) FROM app_user")) {
+            result.next(); assertThat(result.getInt(1)).isEqualTo(2);
+        } finally { TenantContext.clear(); }
+        try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement();
+             var result = statement.executeQuery("SELECT count(*) FROM app_user")) {
+            result.next(); assertThat(result.getInt(1)).isZero();
+        }
+    }
+
+    @Test void applicationRoleCannotReadWriteDeleteOrLinkOtherClinicRecords() {
+        TenantContext.set(clinicId);
+        try {
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM patient", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM patient WHERE id=?", Integer.class, otherPatientId)).isZero();
+            assertThat(jdbc.update("UPDATE patient SET first_name='spoofed' WHERE id=?", otherPatientId)).isZero();
+            assertThat(jdbc.update("DELETE FROM patient WHERE id=?", otherPatientId)).isZero();
+            org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class,
+                    () -> jdbc.update("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (?,?,?,?,?)",
+                            UUID.randomUUID(), otherClinicId, "spoof-" + UUID.randomUUID(), "Spoof", "Patient"));
+            org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class,
+                    () -> jdbc.update("INSERT INTO auth_refresh_session(clinic_id,user_id,token_hash,expires_at) VALUES (?,?,?,now()+interval '1 day')",
+                            clinicId, otherUserId, "cross-clinic-" + UUID.randomUUID()));
+        } finally { TenantContext.clear(); }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM patient", Integer.class)).isZero();
+    }
+
+    private String expiredAccessToken() {
+        byte[] secret = "m04-integration-test-jwt-secret-32-bytes-minimum".getBytes(StandardCharsets.UTF_8);
+        var encoder = new NimbusJwtEncoder(new ImmutableSecret<>(secret));
+        Instant now = Instant.now();
+        var claims = JwtClaimsSet.builder().issuer("dental-clinic-saas").subject(activeUserId.toString())
+                .issuedAt(now.minusSeconds(300)).expiresAt(now.minusSeconds(120))
+                .claim("clinic_id", clinicId.toString()).claim("role", "OWNER").build();
+        return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
+    }
+}

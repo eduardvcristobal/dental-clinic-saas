@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(s)
         setStatus('authenticated')
       } else {
+        setAccessToken(null)
         setStatus('anonymous')
       }
     })

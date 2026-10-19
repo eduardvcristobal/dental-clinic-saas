@@ -2,7 +2,7 @@ package com.dentalapp.tenancy;
 
 import java.util.UUID;
 
-/** Holds the current clinic (tenant) for this thread. Set by TenantFilter, or by jobs via runAs(). */
+/** Holds the current clinic (tenant) for this thread. Always restored at request/job boundaries. */
 public final class TenantContext {
     /** Used when no tenant is set; matches no rows, so unauthenticated code fails closed. */
     public static final UUID NONE = new UUID(0L, 0L);
@@ -19,6 +19,17 @@ public final class TenantContext {
         UUID previous = CURRENT.get();
         CURRENT.set(clinicId);
         try { task.run(); }
-        finally { if (previous == null) CURRENT.remove(); else CURRENT.set(previous); }
+        finally { restore(previous); }
+    }
+
+    public static <T> T callAs(UUID clinicId, java.util.function.Supplier<T> task) {
+        UUID previous = CURRENT.get();
+        CURRENT.set(clinicId);
+        try { return task.get(); }
+        finally { restore(previous); }
+    }
+
+    private static void restore(UUID previous) {
+        if (previous == null) CURRENT.remove(); else CURRENT.set(previous);
     }
 }

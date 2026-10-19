@@ -5,6 +5,20 @@ on:
 jobs:
   java17:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dental
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-owner-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dental"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -12,8 +26,58 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - name: Run unit tests and compile on JDK 17
+      - name: Create disposable clean migration database
+        env:
+          PGPASSWORD: ci-owner-password
+        run: createdb -h localhost -U postgres dental_m04_migration
+      - name: Run backend unit and PostgreSQL integration tests on JDK 17
         working-directory: backend
         env:
           APP_JWT_SECRET: 'ci-only-strong-secret-not-for-real-deployment-123456789'
-        run: mvn -B -ntp test
+          DB_URL: jdbc:postgresql://localhost:5432/dental
+          DB_OWNER_USER: postgres
+          DB_OWNER_PASSWORD: ci-owner-password
+          DB_APP_USER: dental_app
+          DB_APP_PASSWORD: ci-app-password
+          APP_ALLOWED_ORIGINS: http://localhost:5173
+          M04_AUTH_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental
+          M04_AUTH_TEST_OWNER_USER: postgres
+          M04_AUTH_TEST_OWNER_PASSWORD: ci-owner-password
+          M04_AUTH_TEST_APP_USER: dental_app
+          M04_AUTH_TEST_APP_PASSWORD: ci-app-password
+          M04_MIGRATION_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m04_migration
+          M04_MIGRATION_TEST_OWNER_USER: postgres
+          M04_MIGRATION_TEST_OWNER_PASSWORD: ci-owner-password
+          M04_MIGRATION_TEST_APP_PASSWORD: ci-app-password
+        run: mvn -B -ntp verify
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/dependency-review-action@v4
+        if: github.event_name == 'pull_request'

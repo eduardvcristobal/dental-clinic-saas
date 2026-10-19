@@ -11,8 +11,8 @@ import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 /**
  * Stamps every connection checkout with the current tenant (session variable app.clinic_id) so the
- * PostgreSQL RLS policies in V8 apply. The value is overwritten on each checkout, so a pooled
- * connection can never leak the previous request's tenant.
+ * PostgreSQL RLS policies apply. The value is overwritten on checkout and cleared before return so
+ * a pooled connection cannot leak a previous request's tenant.
  */
 public class TenantAwareDataSource extends DelegatingDataSource {
 

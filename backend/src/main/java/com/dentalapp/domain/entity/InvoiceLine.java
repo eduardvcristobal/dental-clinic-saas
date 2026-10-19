@@ -16,6 +16,7 @@ import org.hibernate.type.SqlTypes;
 @Getter @Setter
 public class InvoiceLine extends TenantEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) private Invoice invoice;
+    public void setInvoice(Invoice invoice) { this.invoice = invoice; }
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "procedure_id") private ProcedureCatalog procedure;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "plan_item_id") private TreatmentPlanItem planItem;
     @Column(nullable = false) private String description;

@@ -1,7 +1,9 @@
-# Dental Clinic SaaS (monorepo)
+# Dental Clinic SaaS
 
-| Folder | What |
-|---|---|
-| `backend/` | Spring Boot 3.3 / Java 17 / PostgreSQL / Flyway. Multi-tenant (Hibernate `@TenantId` + PostgreSQL RLS). See `backend/README.md`. |
-| `frontend/` | React + TypeScript + Vite. Google sign-in. |
-| `docs/` | Original schema design (`dental_schema.sql`) and ERD (`dental_erd.mermaid`). Flyway migrations in `backend/` are the source of truth. |
+Monorepo foundation for a multi-tenant dental clinic management SaaS.
+
+- `backend/`: Spring Boot 3.3.5, Java 17, PostgreSQL, Flyway. See [backend setup](backend/README.md).
+- `frontend/`: React, TypeScript and Vite. See [frontend setup](frontend/README.md).
+- `docs/`: foundation audit and milestone validation reports.
+
+Current status: **M0.4 local validation passed; the project is not production or pilot ready.** Fresh PostgreSQL migration/RLS, backend auth/session integration, and frontend API/build checks passed locally. GitHub Actions and live Google/browser sign-in still need verification. See [PROJECT_STATUS.md](PROJECT_STATUS.md).

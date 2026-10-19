@@ -72,7 +72,7 @@ public class AuthService {
     }
     public Issued rotate(String cookie) {
         UUID clinic = cookieClinic(cookie);
-        return TenantContextResult.call(clinic, () -> transactions.execute(status -> {
+        Issued issued = TenantContextResult.call(clinic, () -> transactions.execute(status -> {
             var matches = jdbc.query("""
                 SELECT u.id,u.clinic_id,u.email,u.full_name,u.role,c.slug,c.name
                 FROM auth_refresh_session s JOIN app_user u ON u.id=s.user_id AND u.clinic_id=s.clinic_id
@@ -80,10 +80,20 @@ public class AuthService {
                 WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>now()
                   AND u.active=true AND c.active=true FOR UPDATE OF s
                 """, (rs, row) -> staff(rs), hash(cookie));
-            if (matches.size()!=1) throw unauthorized();
+            if (matches.size()!=1) {
+                // Reuse of a revoked token revokes every live session for that user in this clinic.
+                jdbc.update("""
+                    UPDATE auth_refresh_session SET revoked_at=now()
+                    WHERE clinic_id=? AND user_id=(SELECT user_id FROM auth_refresh_session WHERE token_hash=?)
+                      AND revoked_at IS NULL
+                    """, clinic, hash(cookie));
+                return null;
+            }
             jdbc.update("UPDATE auth_refresh_session SET revoked_at=now() WHERE token_hash=? AND revoked_at IS NULL", hash(cookie));
             return issue(matches.get(0));
         }));
+        if (issued == null) throw unauthorized();
+        return issued;
     }
     public void revoke(String cookie) {
         UUID clinic = cookieClinic(cookie);

@@ -14,7 +14,9 @@ public class GoogleIdentityVerifier {
     private final String audience;
     GoogleIdentityVerifier(AuthProperties p) {
         this.audience = p.googleClientId();
-        decoder = NimbusJwtDecoder.withJwkSetUri("https://www.googleapis.com/oauth2/v3/certs").build();
+        String jwkSetUri = p.googleJwkSetUri();
+        decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri == null || jwkSetUri.isBlank()
+                ? "https://www.googleapis.com/oauth2/v3/certs" : jwkSetUri).build();
     }
     public String verifiedEmail(String idToken) {
         if (audience==null || audience.isBlank())
