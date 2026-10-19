@@ -1,5 +1,5 @@
 export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'DENTIST' | 'FRONT_DESK'
-export type CapabilityState = 'preview' | 'coming-soon'
+export type CapabilityState = 'active' | 'preview' | 'coming-soon'
 export interface WorkspaceModule { id: string; title: string; group: string; description: string; state: CapabilityState; roles: WorkspaceRole[] }
 const ALL: WorkspaceRole[] = ['OWNER', 'ADMIN', 'DENTIST', 'FRONT_DESK']
 const CLINICAL: WorkspaceRole[] = ['OWNER', 'ADMIN', 'DENTIST']
@@ -26,6 +26,7 @@ export const WORKSPACE_MODULES: WorkspaceModule[] = [
   { id: 'staff', title: 'Staff & Roles', group: 'Administration', description: 'Personnel and permissions', state: 'coming-soon', roles: ADMIN },
   { id: 'chairs', title: 'Chairs & Resources', group: 'Administration', description: 'Chair and resource setup', state: 'coming-soon', roles: ADMIN },
   { id: 'settings', title: 'Clinic Settings', group: 'Administration', description: 'Clinic preferences', state: 'coming-soon', roles: ADMIN },
+  { id: 'module-status', title: 'Module Status', group: 'Administration', description: 'Feature readiness and navigation governance', state: 'preview', roles: ADMIN },
   { id: 'audit-log', title: 'Audit Log', group: 'Administration', description: 'Read-only clinical and system audit activity', state: 'coming-soon', roles: ADMIN },
 ]
 export function canSeeModule(id: string, role: string): boolean { return WORKSPACE_MODULES.some(m => m.id === id && m.roles.includes(role as WorkspaceRole)) }

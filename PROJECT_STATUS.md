@@ -4,7 +4,7 @@
 **Authoritative baseline:** M0.3 working repository plus M0.4 validation fixes
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M0.6 patient journey simulation implemented; M0.5 visual verification and M0.4 security/CI/provider checks remain; **not pilot-ready**.
+**Overall status:** M0.7 frontend governance implemented; M0.6 patient journey simulation implemented; M0.5 visual verification and M0.4 security/CI/provider checks remain; **not pilot-ready**.
 
 ## Progress conventions
 
@@ -21,6 +21,7 @@
 | M0 | Foundation audit & setup | **In progress — M0.4 local validation passed; CI/provider checks open** | Java 17, local PG migration/RLS/auth tests, frontend checks passed; hosted CI and browser/provider verification pending |
 | M0.5 | Role-specific application shell & connected UI previews | Implemented — review/verification pending | Responsive navigation, safe demo state, role-based previews, tests |
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
+| M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
 | M1 | Clinics, branches, dentists, chairs, staff | Not started | Complete tenant/branch onboarding, permissions and CRUD with tests |
 | M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
@@ -133,3 +134,14 @@ Complete a live Google sign-in smoke check at `/platform-admin/login` (after con
 - [ ] M0.4 Platform Admin and RLS/provider/CI security blockers remain open.
 
 **Change policy:** M0.6 does not activate M1–M8 modules. The demo does not grant clinical or financial access.
+
+## M0.7 — Permissions, Module Activation & Navigation Governance (2026-10-19)
+- [x] Added central frontend governance decisions for role, module state and demo action; unknown roles/modules fail closed.
+- [x] Added separate read-only Module Status preview for Owner/Administrator; navigation distinguishes Preview vs Coming soon.
+- [x] Patient 360° demo clinical editing is now checked through centralized role decision.
+- [x] Created governance regression tests for unknown roles, clinical preview restrictions and unimplemented modules.
+- [ ] Unit tests and full production build require installed frontend dependencies; see current verification report.
+- [ ] Backend endpoint-level RBAC, subscription entitlements, and real feature activation are **not implemented** in M0.7 and must be addressed before business APIs ship. Frontend decisions are never trusted for backend security.
+- [ ] M0.4 platform-admin RLS privilege review, CI and live Google login verification remain outstanding.
+
+**M0.7 scope:** visual readiness/navigation governance, not a clinic entitlement or clinical authorization release. Next: M1 Clinic & Branch Management, subject to open foundation security gates.
