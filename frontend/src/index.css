@@ -1,0 +1,32 @@
+:root {
+  --bg: #f5f7fa; --surface: #fff; --text: #1b2430; --muted: #66727f; --border: #e1e6ec;
+  --brand: #0e7c86; --brand-dark: #0a5e66; --danger: #b3261e;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text); background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #11161c; --surface: #1a212a; --text: #e8edf2; --muted: #93a0ad; --border: #2a3440; --brand: #2bb3bf; --brand-dark: #4cc5d0; --danger: #f2877f; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+h1, h2, h3 { margin: 0 0 .4rem; }
+.muted { color: var(--muted); } .small { font-size: .875rem; }
+.center { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+.login { width: min(100%, 380px); display: grid; gap: .9rem; text-align: center; }
+.field { display: grid; gap: .3rem; text-align: left; font-size: .875rem; }
+.field input { padding: .6rem .7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 1rem; }
+.field input:focus { outline: 2px solid var(--brand); border-color: transparent; }
+.google-slot { display: grid; place-items: center; min-height: 44px; }
+.google-slot.busy { opacity: .5; pointer-events: none; }
+.error { color: var(--danger); margin: 0; font-size: .9rem; }
+.shell { min-height: 100vh; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .75rem 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.topbar-right { display: flex; align-items: center; gap: .9rem; }
+.btn { padding: .45rem .9rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); cursor: pointer; font-size: .9rem; }
+.btn:hover { border-color: var(--brand); color: var(--brand-dark); }
+.content { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; margin-top: 1rem; }
+.module { opacity: .75; } .module p { margin: .2rem 0 .8rem; }
+.badge { font-size: .75rem; padding: .15rem .5rem; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+code { background: var(--bg); padding: .1rem .35rem; border-radius: 4px; }
