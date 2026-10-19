@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-19
 **Source branch:** main, based on M2.4 commit `be5ee2b`
-**Final source commit:** recorded after the M2.5 commit; hosted CI is not available to verify it.
+**Final application-code commit:** `42c3ffbe9b7ff6239125ad98e903b1952c258eeb` (`test(m2.5): complete patient management runtime regression`).
 **Decision:** **M2 remains OPEN.** Local development checks passed, but hosted GitHub Actions on the final application SHA is a required gate and is BLOCKED by invalid GitHub CLI credentials/API access.
 
 ## Executed acceptance results
