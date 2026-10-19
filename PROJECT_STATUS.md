@@ -354,3 +354,18 @@ See [M1.4.6 final acceptance report](docs/M1_4_6_FINAL_ACCEPTANCE_REPORT.md), [l
 - [ ] Real signature capture, guardian authority verification, signed consent storage, patient merge/identity reconciliation and full clinical workflows remain out of scope.
 
 See `docs/M2_2_DELIVERY_REPORT.md`. NVD scan remains deferred to M10 and remains a production gate.
+
+## M2.3 — Patient 360° integration and regression preparation (2026-10-19)
+
+**Status: PARTIALLY IMPLEMENTED / RUNTIME VALIDATION PENDING.** Synthetic patient data only.
+
+- [x] Patient 360° now resolves a selected patient through authenticated `/api/patients/{id}` rather than presenting fictional Maria Santos as if it were a real patient record.
+- [x] Patient search and selection from the clinic-scoped registry; deep linking to selected patient from Patient Registry.
+- [x] Patient-specific demographics and the existing M2.2 medical history, guardian, consent and identity-review UI are reachable together.
+- [x] Clinical roles continue to control medical history visibility through M2.2 backend permissions; Front Desk cannot view medical history.
+- [x] Unimplemented odontogram, visits, treatment plans and billing are explicit Coming soon screens, not fake records attributed to patients.
+- [ ] Java 17 compilation, PostgreSQL V1–V15 migration/RLS and clinical authorization integration tests must run on the development machine.
+- [ ] React TypeScript production build, lint, Vitest and authenticated browser E2E must pass before M2.3 can be accepted.
+- [ ] Minor legal-guardian authority, signed informed consent and patient identity merge/reconciliation remain out of scope and must not be treated as verified.
+
+See `docs/M2_3_INTEGRATION_REPORT.md` for delivery scope and validation checklist.
