@@ -145,3 +145,20 @@ Complete a live Google sign-in smoke check at `/platform-admin/login` (after con
 - [ ] M0.4 platform-admin RLS privilege review, CI and live Google login verification remain outstanding.
 
 **M0.7 scope:** visual readiness/navigation governance, not a clinic entitlement or clinical authorization release. Next: M1 Clinic & Branch Management, subject to open foundation security gates.
+
+## M1 — Clinic & Branch Management (2026-10-19)
+
+**Status: IN PROGRESS — initial existing-clinic configuration implemented; NOT runtime-validated.**
+
+- [x] M1.1 Backend management routes for existing clinic settings and Owner/Admin role enforcement.
+- [x] M1.1 Branch create/update/activation, chair create/update/activation, staff-to-branch assignment/unassignment of existing staff.
+- [x] M1.1 Operating hours table in Flyway V12, strict weekday/time and tenant branch constraints, RLS enabled/forced.
+- [x] M1.1 React-connected administration screens for clinic settings, branches, chairs and staff assignments.
+- [x] M1.1 Authorization/validation unit tests authored (not executed).
+- [ ] Run JDK 17 Maven tests and fresh PostgreSQL V1–V12 migration, restricted-role RLS tests, cross-tenant and branch assignment cases.
+- [ ] Run full frontend install, lint, Vitest and Vite build (offline install blocked by uncached dependency).
+- [ ] M1.2 Secure first-clinic/Owner provisioning, user invitations, dentist mapping and audit events.
+- [ ] M1.3 Browser UI tests, staff-privilege checks, scheduling/branch availability behavior.
+- [ ] Resolve M0.4 Platform Admin cross-tenant privilege and CI/Google provider tests before real clinical data.
+
+See `docs/M1_CLINIC_MANAGEMENT_REPORT.md`. No M1 completion or production-ready claim.
