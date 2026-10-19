@@ -1,6 +1,8 @@
 package com.dentalapp.tenancy;
 
 import java.sql.Connection;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
@@ -35,6 +37,21 @@ public class TenantAwareDataSource extends DelegatingDataSource {
             c.close();
             throw e;
         }
-        return c;
+        return (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(),
+            new Class<?>[]{Connection.class}, (proxy, method, args) -> {
+                if (method.getName().equals("close")) {
+                    try {
+                        if (!c.isClosed()) {
+                            // A caller may close while in an aborted transaction; rollback first.
+                            if (!c.getAutoCommit()) c.rollback();
+                            try (PreparedStatement reset = c.prepareStatement(
+                                    "SELECT set_config('app.clinic_id', '', false)")) { reset.execute(); }
+                        }
+                    } finally { c.close(); }
+                    return null;
+                }
+                try { return method.invoke(c, args); }
+                catch (InvocationTargetException e) { throw e.getCause(); }
+            });
     }
 }

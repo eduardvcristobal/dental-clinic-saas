@@ -29,3 +29,23 @@ BYPASSRLS role**: PostgreSQL skips RLS for them.
 
 ## Run
 `mvn spring-boot:run` (needs PostgreSQL and the setup above). Hibernate is set to `ddl-auto: validate`; Flyway owns the schema.
+
+## M0.3 authentication configuration (Java 17)
+
+Required environment variables: `DB_URL`, `DB_APP_PASSWORD`, `DB_OWNER_PASSWORD`,
+`GOOGLE_CLIENT_ID`, `APP_JWT_SECRET` (random, at least 32 UTF-8 bytes), and
+`APP_ALLOWED_ORIGINS` (comma-separated exact browser origins). `DB_APP_USER`
+(default `dental_app`) must NOT be a schema owner, superuser or have `BYPASSRLS`.
+`DB_OWNER_USER` controls Flyway only. In local HTTP development, set
+`APP_COOKIE_SECURE=false`; production MUST use HTTPS and the default `true`.
+
+`POST /api/auth/google` accepts `{clinicSlug,idToken}` and admits *existing active*
+clinic staff only. `POST /api/auth/refresh` rotates an HttpOnly, SameSite=Strict,
+path-scoped refresh cookie; `POST /api/auth/logout` revokes it. Access JWTs expire
+in ten minutes and carry a server-issued clinic id and role. Google identity is
+verified against Google's public signing keys and configured OAuth client ID.
+There is no public self-registration; staff invitations are part of M1.
+
+Run Flyway migrations using the database owner and `auth_refresh_session` V9.
+For local authentication, ensure the frontend and API are **same-site** (CORS
+alone cannot override SameSite cookie rules). NEVER deploy with sample credentials.

@@ -1,0 +1,19 @@
+name: Backend Java 17
+on:
+  push:
+  pull_request:
+jobs:
+  java17:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Run unit tests and compile on JDK 17
+        working-directory: backend
+        env:
+          APP_JWT_SECRET: 'ci-only-strong-secret-not-for-real-deployment-123456789'
+        run: mvn -B -ntp test

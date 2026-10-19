@@ -2,13 +2,13 @@ spring:
   application:
     name: dental-backend
   datasource:                       # runtime: NON-superuser role without BYPASSRLS, or RLS is skipped
-    url: jdbc:postgresql://localhost:5432/dental
-    username: dental_app
-    password: ${DB_APP_PASSWORD:app}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dental}
+    username: ${DB_APP_USER:dental_app}
+    password: ${DB_APP_PASSWORD}
   flyway:                           # migrations run as the schema owner, separate from runtime
-    url: jdbc:postgresql://localhost:5432/dental
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dental}
     user: ${DB_OWNER_USER:postgres}
-    password: ${DB_OWNER_PASSWORD:postgres}
+    password: ${DB_OWNER_PASSWORD}
     locations: classpath:db/migration
   jpa:
     open-in-view: false
@@ -17,3 +17,11 @@ spring:
     properties:
       hibernate:
         jdbc.time_zone: UTC
+
+app:
+  auth:
+    google-client-id: ${GOOGLE_CLIENT_ID:}
+    jwt-secret: ${APP_JWT_SECRET:}
+    cookie-secure: ${APP_COOKIE_SECURE:true}
+    # Exact browser origins permitted to make credentialed auth requests.
+    allowed-origins: ${APP_ALLOWED_ORIGINS:}

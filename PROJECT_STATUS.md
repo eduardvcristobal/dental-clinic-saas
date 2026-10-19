@@ -44,15 +44,15 @@
 - [x] Set Maven `java.version` to **17**.
 - [x] Update root/backend documentation to **Java 17**.
 - [ ] Run a clean Maven build and tests using an actual **JDK 17** runtime.
-- [ ] Add CI enforcing JDK 17 and prohibit Java 18+ APIs in compiled code.
+- [x] Add GitHub Actions JDK 17 Maven unit-test workflow (not yet executed).
 
 ### M0.3 — Backend/application security completion
-- [ ] Implement and test Spring Security filter chain and Google ID-token verification.
-- [ ] Implement `/api/auth/google`, `/api/auth/refresh`, `/api/auth/logout` with secure refresh token handling.
+- [x] Add Spring Security Bearer filter chain and Google ID-token verification source; runtime/integration verification pending.
+- [x] Add `/api/auth/google`, `/api/auth/refresh`, `/api/auth/logout`, short-lived JWTs, rotating hashed refresh tokens and scoped HttpOnly cookies; execution pending.
 - [ ] Add staff authorization, clinic/branch permissions, audit of clinical/financial access.
-- [ ] Review `TenantAwareDataSource` and guarantee pool-safe tenant reset under connection reuse.
-- [ ] Test PostgreSQL RLS using non-owner/non-`BYPASSRLS` runtime role and multiple clinics.
-- [ ] Exercise Flyway V1–V8 against fresh PostgreSQL; reconcile schema/entity validation.
+- [x] Add pool-return tenant reset to `TenantAwareDataSource` and place `TenantFilter` after JWT authentication only; require runtime pool-reuse tests.
+- [ ] Run non-owner/non-`BYPASSRLS` RLS tests with seeded multi-clinic fixtures (basic SQL verification script added).
+- [ ] Exercise Flyway V1–V9 against fresh PostgreSQL; reconcile schema/entity validation.
 - [ ] Add integration tests for tenant isolation, RBAC, appointments, monetary ledger.
 
 ### M0.4 — Delivery and baseline validation
@@ -63,7 +63,7 @@
 
 ## Initial observations (2026-10-19)
 
-- 8 Flyway migrations (`V1`–`V8`) present; source includes RLS policies and Hibernate tenant entities. **Runtime enforcement not yet validated.**
+- 9 Flyway migrations (`V1`–`V9`) present; source includes RLS policies and Hibernate tenant entities. **Runtime enforcement not yet validated.**
 - 25 entity classes, 4 repositories, and tenancy utilities present. Entity presence does not mean a working feature.
 - Frontend Google login expects `/api/auth/*` contracts but backend controllers and authentication implementation are absent from this uploaded archive.
 - `TenantFilter` is a component, but its placement after successful authentication has not been demonstrated by a configured security chain.
@@ -79,12 +79,15 @@
 | 2026-10-19 | Backend JDK 17 runtime build | **Not verified**; runner only reported JDK 21 initially |
 | 2026-10-19 | PostgreSQL migration + RLS runtime | **Not verified** |
 | 2026-10-19 | Real Google authentication | **Not implemented** |
+| 2026-10-19 | M0.3 auth/RLS code and tests | **Source implemented; tests NOT executed** (Maven, JDK17, PostgreSQL unavailable) |
 | 2026-10-19 | Frontend `npm ci --offline` | **Blocked**: uncached `vite-8.3.4.tgz`; build/lint not run |
 
 ## Next recommended task
 
-**M0.3 — Authentication, tenant isolation and migrations**. Implement a secure, tested backend authentication flow before enabling clinical features. Set up a JDK 17 execution environment and PostgreSQL test database, then close M0 validation gates before calling M0 complete.
+**M0.3 validation continuation**. Run Maven/JDK 17 and PostgreSQL 16+ Flyway migration tests, verify two-clinic RLS and refresh rotation in actual HTTP calls, and reconcile failed tests. Next: M0.4 runtime/CI and frontend integration before M1.
 
 ## Change log
 
 - **2026-10-19 — M0 started:** Inventory and audit; Java 17 target; project status tracker created. No feature completion or runtime test success claimed.
+
+- **2026-10-19 — M0.3 implementation delivered:** Google ID-token verification, server-issued Bearer JWT, rotating RLS-scoped refresh session table (V9), database tenant reset, Java 17 CI workflow, small unit tests, and basic RLS checklist. **No runtime tests passed or were run in this environment; milestone remains in progress.**
