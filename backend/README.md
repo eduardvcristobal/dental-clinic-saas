@@ -1,4 +1,4 @@
-# Dental Clinic SaaS: Backend (Spring Boot 3.3 / Java 21 / PostgreSQL)
+# Dental Clinic SaaS: Backend (Spring Boot 3.3 / Java 17 / PostgreSQL)
 
 ## Multi-tenancy design (shared database, shared schema)
 Two independent layers, so one bug cannot leak another clinic's data:
