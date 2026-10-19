@@ -8,6 +8,8 @@ Google sign-in (Google Identity Services via `@react-oauth/google`), multi-tenan
 2. `cp .env.example .env` and set `VITE_GOOGLE_CLIENT_ID`.
 3. `npm install && npm run dev` (the backend is expected on `localhost:8080`; `/api` is proxied).
 
+Allowlisted platform administrators can sign in at `/platform-admin/login` without a clinic code. Their Google email must appear in the backend `CLINIC_PLATFORM_ADMIN_EMAILS` setting.
+
 Run the frontend checks with `npm ci && npm test && npm run build && npm run lint`.
 Vitest covers concurrent refresh coalescing, restoration after a 401, and session expiry handling.
 

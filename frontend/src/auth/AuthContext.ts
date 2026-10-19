@@ -7,6 +7,7 @@ export interface AuthContextValue {
   status: AuthStatus
   session: Session | null
   signInWithGoogle: (clinicSlug: string, idToken: string) => Promise<void>
+  signInAsPlatformAdmin: (idToken: string) => Promise<void>
   signOut: () => Promise<void>
 }
 

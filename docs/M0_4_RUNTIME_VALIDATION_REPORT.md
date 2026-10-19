@@ -37,3 +37,10 @@ This verifies the configured verification logic with controlled test keys. It do
 - No live Google identity or production OAuth credentials were used or needed for these tests.
 
 M0.4 should remain **in progress** until CI succeeds and the browser/provider-specific checks are reviewed. This report does not claim pilot or production readiness.
+
+## Subsequent platform-admin implementation (2026-10-19)
+
+- Added an allowlisted Google sign-in that issues a tenantless `PLATFORM_ADMIN` access token and clinic-independent rotating refresh session. The frontend now provides `/platform-admin/login` and a protected `/platform-admin` overview.
+- `mvn -q -DskipTests compile` passed; `npm run build` passed. The local Spring Boot app restarted successfully against `dental`, applying V11. The unauthenticated `/api/platform-admin/clinics` endpoint returned HTTP 401.
+- The earlier automated totals remain **16 passed, 0 failed, 0 skipped, 0 blocked** (13 backend and 3 frontend). Platform-admin-specific automated tests were not run; a real Google browser sign-in was not verified.
+- Local backend and frontend Google client IDs now match. Confirm the Google Console JavaScript origin `http://localhost:5173` before signing in.

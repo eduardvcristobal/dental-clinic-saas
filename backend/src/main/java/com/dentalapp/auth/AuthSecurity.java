@@ -43,10 +43,15 @@ public class AuthSecurity {
                 JwtValidators.createDefaultWithIssuer("dental-clinic-saas"), jwt -> {
                     try {
                         UUIDFromClaim.require(jwt.getSubject());
-                        UUIDFromClaim.require(jwt.getClaimAsString("clinic_id"));
                         String role = jwt.getClaimAsString("role");
-                        if (role == null || !List.of("OWNER", "ADMIN", "DENTIST", "FRONT_DESK").contains(role))
-                            throw new IllegalArgumentException("invalid role");
+                        if ("PLATFORM_ADMIN".equals(role)) {
+                            if (!Boolean.TRUE.equals(jwt.getClaim("platform_admin")) || jwt.getClaims().containsKey("clinic_id"))
+                                throw new IllegalArgumentException("invalid platform admin claims");
+                        } else {
+                            UUIDFromClaim.require(jwt.getClaimAsString("clinic_id"));
+                            if (role == null || !List.of("OWNER", "ADMIN", "DENTIST", "FRONT_DESK").contains(role))
+                                throw new IllegalArgumentException("invalid role");
+                        }
                         return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.success();
                     } catch (RuntimeException invalid) {
                         return org.springframework.security.oauth2.core.OAuth2TokenValidatorResult.failure(
@@ -83,10 +88,16 @@ public class AuthSecurity {
           .authorizeHttpRequests(reg -> reg
              .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
              .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-             .requestMatchers("/api/auth/google", "/api/auth/refresh", "/api/auth/logout").permitAll()
+             .requestMatchers("/api/auth/google", "/api/auth/platform-admin/google", "/api/auth/refresh", "/api/auth/logout").permitAll()
+             .requestMatchers("/api/platform-admin/**").hasRole("PLATFORM_ADMIN")
              .anyRequest().authenticated())
           .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(decoder).jwtAuthenticationConverter(jwt -> {
               Jwt token = jwt;
+              if ("PLATFORM_ADMIN".equals(token.getClaimAsString("role"))) {
+                  var principal = new PlatformAdminPrincipal(UUIDFromClaim.require(token.getSubject()), token.getClaimAsString("email"));
+                  return new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                      principal, token, List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN")));
+              }
               AuthPrincipal principal = new AuthPrincipal(UUIDFromClaim.require(token.getSubject()),
                   UUIDFromClaim.require(token.getClaimAsString("clinic_id")), token.getClaimAsString("role"));
               return new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(

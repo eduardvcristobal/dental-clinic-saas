@@ -66,12 +66,24 @@
 - [x] Setup docs, environment examples and three validation reports updated with executed results and remaining risks.
 - [ ] M0.4 remains in progress until CI and browser/provider checks are complete; no pilot/production readiness claim.
 
+## Local platform administration update (2026-10-19)
+- Added a separate Google platform-admin login using the backend `CLINIC_PLATFORM_ADMIN_EMAILS` allowlist.
+- Platform-admin access tokens and refresh sessions have no clinic ID. V11 adds a privileged RLS policy activated only by a validated platform-admin principal; the initial platform page reads a global clinic overview and aggregate staff/patient counts.
+- Added `/platform-admin/login` and `/platform-admin`; aligned local backend and frontend OAuth client IDs to the Google Web client ID provided by the owner.
+- The local `dental` database applied V11 and the app started. Backend compilation and frontend production build passed. The M0.4 and platform-admin automated tests have not been rerun for this update; browser/Google login remains unverified.
+- The local admin overview currently reports clinic metadata and aggregate staff/patient counts. The business module screens and CRUD APIs remain unimplemented.
+
+### Test totals
+- Last recorded M0.4 automated run: **16 passed, 0 failed, 0 skipped, 0 blocked** (13 backend + 3 frontend).
+- Platform-admin changes: **0 tests run**. Backend compilation and frontend production build passed; these are build checks, not test passes.
+
 ## Validation log
 
 | Date | Check | Result |
 |---|---|---|
 | 2026-10-19 | `mvn -o -B -ntp clean verify` on JDK 17.0.20 with disposable local PG databases | **Passed:** 13 tests, 0 failed, 0 skipped; package/repackage passed |
 | 2026-10-19 | Fresh PostgreSQL V1–V10 and Hibernate validation | **Passed:** clean local scratch DB; 10 successful Flyway versions and checksums recorded |
+| 2026-10-19 | Platform-admin tenantless session and V11 RLS policy | **Implemented:** local `dental` DB migration and startup passed; build passed; OAuth browser login not yet verified |
 | 2026-10-19 | Restricted-role RLS and same-clinic constraints | **Passed:** no BYPASSRLS/superuser; read/update/delete/spoof, pool reset and FK denial checks passed |
 | 2026-10-19 | `npm ci` | **Passed:** locked dependencies installed; 0 npm audit vulnerabilities |
 | 2026-10-19 | `npm test && npm run build && npm run lint` | **Passed:** 3 tests, TypeScript/Vite build and lint with no warnings |
@@ -82,8 +94,9 @@ Detailed evidence: [runtime report](docs/M0_4_RUNTIME_VALIDATION_REPORT.md), [da
 
 ## Next recommended task
 
-Run the authored GitHub Actions workflow and review its hosted PostgreSQL 16 and security-scan results; then exercise the Google widget and responsive UI in a browser with a test OAuth client. Complete those checks before starting **M1 — Clinic & Branch Management**.
+Complete a live Google sign-in smoke check at `/platform-admin/login` (after confirming `http://localhost:5173` is an authorized JavaScript origin). Then begin **M1 — Clinic & Branch Management**. GitHub Actions remains deferred per owner direction; run hosted CI when the owner is ready.
 
 ## Change log
 
 - **2026-10-19 — M0.4 validation and hardening:** corrected Java 17 compile errors; added V10 tenant composite constraints; ran fresh V1–V10 PostgreSQL migration, Hibernate validation, restricted-role RLS and same-clinic tests on local PostgreSQL 18.6; added actual HTTP auth/refresh/concurrency tests, claim validation, replay revocation, login/refresh throttles and error-dispatch correction; added frontend API tests and passed TypeScript/Vite/lint. Backend: 13/13 passed. Frontend: 3/3 passed. M0.4 remains in progress pending GitHub Actions and live browser/provider verification.
+- **2026-10-19 — Platform-admin access:** added allowlisted tenantless Google sessions, refresh rotation/revocation, no-clinic JWT validation, platform-admin UI and cross-clinic summary endpoint. V11 migration applied to local `dental`; Java compile and frontend build passed. Automated tests and live Google sign-in were not rerun.

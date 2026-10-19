@@ -30,8 +30,9 @@ public class TenantAwareDataSource extends DelegatingDataSource {
 
     private Connection stamp(Connection c) throws SQLException {
         UUID tenant = TenantContext.get();
-        try (PreparedStatement ps = c.prepareStatement("SELECT set_config('app.clinic_id', ?, false)")) {
+        try (PreparedStatement ps = c.prepareStatement("SELECT set_config('app.clinic_id', ?, false), set_config('app.platform_admin', ?, false)")) {
             ps.setString(1, tenant == null ? "" : tenant.toString());
+            ps.setString(2, Boolean.toString(TenantContext.isPlatformAdmin()));
             ps.execute();
         } catch (SQLException e) {
             c.close();
@@ -45,7 +46,7 @@ public class TenantAwareDataSource extends DelegatingDataSource {
                             // A caller may close while in an aborted transaction; rollback first.
                             if (!c.getAutoCommit()) c.rollback();
                             try (PreparedStatement reset = c.prepareStatement(
-                                    "SELECT set_config('app.clinic_id', '', false)")) { reset.execute(); }
+                                    "SELECT set_config('app.clinic_id', '', false), set_config('app.platform_admin', 'false', false)")) { reset.execute(); }
                         }
                     } finally { c.close(); }
                     return null;

@@ -13,7 +13,8 @@ export interface SessionUser {
   id: string
   fullName: string
   email: string
-  role: 'OWNER' | 'ADMIN' | 'DENTIST' | 'FRONT_DESK'
+  role: 'OWNER' | 'ADMIN' | 'DENTIST' | 'FRONT_DESK' | 'PLATFORM_ADMIN'
+  platformAdmin?: boolean
 }
 
 export interface SessionClinic {
@@ -25,7 +26,7 @@ export interface SessionClinic {
 export interface Session {
   accessToken: string
   user: SessionUser
-  clinic: SessionClinic
+  clinic: SessionClinic | null
 }
 
 // The access token lives in memory only (never localStorage), so XSS cannot read it from storage.

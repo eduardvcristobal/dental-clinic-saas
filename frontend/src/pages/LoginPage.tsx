@@ -1,6 +1,6 @@
 import { GoogleLogin } from '@react-oauth/google'
 import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/useAuth'
 import { getRememberedSlug, normalizeSlug, rememberSlug, slugFromHost } from '../lib/tenant'
@@ -85,6 +85,7 @@ export function LoginPage() {
             {error}
           </p>
         )}
+        <Link to="/platform-admin/login" className="muted small">Platform administrator sign in</Link>
       </section>
     </main>
   )

@@ -27,10 +27,11 @@ public class AuthService {
     private final JdbcTemplate jdbc;
     private final JwtEncoder encoder;
     private final TransactionTemplate transactions;
+    private final AuthProperties props;
     private final SecureRandom random = new SecureRandom();
 
-    AuthService(JdbcTemplate jdbc, JwtEncoder encoder, org.springframework.transaction.PlatformTransactionManager tx) {
-        this.jdbc = jdbc; this.encoder = encoder; this.transactions = new TransactionTemplate(tx);
+    AuthService(JdbcTemplate jdbc, JwtEncoder encoder, org.springframework.transaction.PlatformTransactionManager tx, AuthProperties props) {
+        this.jdbc = jdbc; this.encoder = encoder; this.transactions = new TransactionTemplate(tx); this.props = props;
     }
     public record Staff(UUID id, UUID clinicId, String email, String fullName, String role,
                         String clinicSlug, String clinicName) {}
@@ -56,6 +57,10 @@ public class AuthService {
     public Issued create(Staff staff) {
         return TenantContextResult.call(staff.clinicId(), () -> transactions.execute(status -> issue(staff)));
     }
+    public Issued createPlatformAdmin(String email) {
+        if (!props.isPlatformAdmin(email)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Platform administrator access is not enabled for this account");
+        return transactions.execute(status -> issuePlatformAdmin(email));
+    }
     private Issued issue(Staff staff) {
         byte[] bytes = new byte[32]; random.nextBytes(bytes);
         String token = staff.clinicId() + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -71,6 +76,7 @@ public class AuthService {
                 Map.of("id",staff.clinicId(),"slug",staff.clinicSlug(),"name",staff.clinicName())),token);
     }
     public Issued rotate(String cookie) {
+        if (isPlatformCookie(cookie)) return rotatePlatformAdmin(cookie);
         UUID clinic = cookieClinic(cookie);
         Issued issued = TenantContextResult.call(clinic, () -> transactions.execute(status -> {
             var matches = jdbc.query("""
@@ -96,6 +102,14 @@ public class AuthService {
         return issued;
     }
     public void revoke(String cookie) {
+        if (isPlatformCookie(cookie)) {
+            String hash = hash(cookie);
+            transactions.execute(status -> {
+                jdbc.update("UPDATE platform_admin_refresh_session SET revoked_at=now() WHERE token_hash=? AND revoked_at IS NULL", hash);
+                return null;
+            });
+            return;
+        }
         UUID clinic = cookieClinic(cookie);
         TenantContextResult.call(clinic, () -> transactions.execute(status -> {
             jdbc.update("UPDATE auth_refresh_session SET revoked_at=now() WHERE token_hash=? AND revoked_at IS NULL", hash(cookie));
@@ -107,6 +121,63 @@ public class AuthService {
         try { return UUID.fromString(cookie.substring(0,36)); }
         catch (IllegalArgumentException e) { throw unauthorized(); }
     }
+    private Issued issuePlatformAdmin(String email) {
+        UUID adminId = UUID.randomUUID();
+        byte[] bytes = new byte[32]; random.nextBytes(bytes);
+        String token = "pa." + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        jdbc.update("INSERT INTO platform_admin_refresh_session(admin_id,email,token_hash,expires_at) VALUES(?,?,?,?)",
+                adminId, email.trim().toLowerCase(java.util.Locale.ROOT), hash(token), java.sql.Timestamp.from(Instant.now().plus(REFRESH_LIFETIME)));
+        Instant now = Instant.now();
+        String access = encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(),
+            JwtClaimsSet.builder().issuer("dental-clinic-saas").subject(adminId.toString())
+                .issuedAt(now).expiresAt(now.plus(ACCESS_LIFETIME))
+                .claim("email", email.trim().toLowerCase(java.util.Locale.ROOT))
+                .claim("role", "PLATFORM_ADMIN").claim("platform_admin", true).build())).getTokenValue();
+        return new Issued(new Session(access,
+                Map.of("id", adminId, "email", email.trim().toLowerCase(java.util.Locale.ROOT),
+                        "fullName", email.trim(), "role", "PLATFORM_ADMIN", "platformAdmin", true), null), token);
+    }
+    private Issued rotatePlatformAdmin(String cookie) {
+        if (cookie == null || !cookie.matches("pa\\.[A-Za-z0-9_-]{43}")) throw unauthorized();
+        Issued issued = transactions.execute(status -> {
+            String tokenHash = hash(cookie);
+            var sessions = jdbc.query("""
+                SELECT admin_id,email FROM platform_admin_refresh_session
+                WHERE token_hash=? AND revoked_at IS NULL AND expires_at>now() FOR UPDATE
+                """, (rs, row) -> new PlatformSession((UUID) rs.getObject(1), rs.getString(2)), tokenHash);
+            if (sessions.size() != 1) {
+                jdbc.update("""
+                    UPDATE platform_admin_refresh_session SET revoked_at=now()
+                    WHERE email=(SELECT email FROM platform_admin_refresh_session WHERE token_hash=?) AND revoked_at IS NULL
+                    """, tokenHash);
+                return null;
+            }
+            PlatformSession session = sessions.get(0);
+            jdbc.update("UPDATE platform_admin_refresh_session SET revoked_at=now() WHERE token_hash=? AND revoked_at IS NULL", tokenHash);
+            if (!props.isPlatformAdmin(session.email())) {
+                jdbc.update("UPDATE platform_admin_refresh_session SET revoked_at=now() WHERE email=? AND revoked_at IS NULL", session.email());
+                return null;
+            }
+            return issuePlatformAdmin(session.adminId(), session.email());
+        });
+        if (issued == null) throw unauthorized();
+        return issued;
+    }
+    private Issued issuePlatformAdmin(UUID adminId, String email) {
+        byte[] bytes = new byte[32]; random.nextBytes(bytes);
+        String token = "pa." + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        jdbc.update("INSERT INTO platform_admin_refresh_session(admin_id,email,token_hash,expires_at) VALUES(?,?,?,?)",
+                adminId, email, hash(token), java.sql.Timestamp.from(Instant.now().plus(REFRESH_LIFETIME)));
+        Instant now = Instant.now();
+        String access = encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(),
+            JwtClaimsSet.builder().issuer("dental-clinic-saas").subject(adminId.toString())
+                .issuedAt(now).expiresAt(now.plus(ACCESS_LIFETIME)).claim("email", email)
+                .claim("role", "PLATFORM_ADMIN").claim("platform_admin", true).build())).getTokenValue();
+        return new Issued(new Session(access,
+                Map.of("id", adminId, "email", email, "fullName", email, "role", "PLATFORM_ADMIN", "platformAdmin", true), null), token);
+    }
+    private static boolean isPlatformCookie(String cookie) { return cookie != null && cookie.startsWith("pa."); }
+    private record PlatformSession(UUID adminId, String email) {}
     static String hash(String token) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
@@ -118,9 +189,15 @@ public class AuthService {
     }
     private static final class TenantContextResult {
         static <T> T call(UUID tenant, java.util.function.Supplier<T> operation) {
-            UUID old = TenantContext.get(); TenantContext.set(tenant);
+            UUID old = TenantContext.get();
+            boolean oldPlatformAdmin = TenantContext.isPlatformAdmin();
+            TenantContext.set(tenant);
             try { return operation.get(); }
-            finally { if (old==null) TenantContext.clear(); else TenantContext.set(old); }
+            finally {
+                if (oldPlatformAdmin) TenantContext.setPlatformAdmin();
+                else if (old==null) TenantContext.clear();
+                else TenantContext.set(old);
+            }
         }
     }
 }

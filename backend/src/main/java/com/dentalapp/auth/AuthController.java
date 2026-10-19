@@ -23,6 +23,7 @@ public class AuthController {
         this.service=service;this.google=google;this.props=props;
     }
     record GoogleLogin(@NotBlank String clinicSlug, @NotBlank String idToken) {}
+    record PlatformAdminGoogleLogin(@NotBlank String idToken) {}
     @PostMapping("/google")
     ResponseEntity<AuthService.Session> google(@Valid @RequestBody GoogleLogin request, HttpServletRequest http) {
         checkOrigin(http);
@@ -31,6 +32,12 @@ public class AuthController {
         var staff=clinic==null?null:service.staffByEmail(clinic,email);
         if(staff==null) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"No active clinic staff membership");
         return respond(service.create(staff));
+    }
+    @PostMapping("/platform-admin/google")
+    ResponseEntity<AuthService.Session> platformAdminGoogle(@Valid @RequestBody PlatformAdminGoogleLogin request, HttpServletRequest http) {
+        checkOrigin(http);
+        String email = google.verifiedEmail(request.idToken());
+        return respond(service.createPlatformAdmin(email));
     }
     @PostMapping("/refresh")
     ResponseEntity<AuthService.Session> refresh(@CookieValue(name="dental_refresh",required=false) String cookie,

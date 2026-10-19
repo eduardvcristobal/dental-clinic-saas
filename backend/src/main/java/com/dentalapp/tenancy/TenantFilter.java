@@ -23,7 +23,9 @@ public class TenantFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof TenantPrincipal p) {
+            if (auth != null && auth.getPrincipal() instanceof com.dentalapp.auth.PlatformAdminPrincipal) {
+                TenantContext.setPlatformAdmin();
+            } else if (auth != null && auth.getPrincipal() instanceof TenantPrincipal p) {
                 TenantContext.set(p.getClinicId());
             }
             chain.doFilter(req, res);

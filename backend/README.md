@@ -17,7 +17,7 @@ CREATE DATABASE dental OWNER postgres;
 GRANT CONNECT ON DATABASE dental TO dental_app;
 ```
 
-Flyway runs as `DB_OWNER_USER`; application queries use `DB_APP_USER`. V8/V9/V10 enforce row-level security and same-clinic relationships. Never use a superuser or `BYPASSRLS` role for application traffic.
+Flyway runs as `DB_OWNER_USER`; application queries use `DB_APP_USER`. V8/V9/V10 enforce row-level security and same-clinic relationships. V11 adds an explicit global-access policy used only for allowlisted platform-admin sessions. Never use a superuser or `BYPASSRLS` role for application traffic.
 
 Copy `.env.example` values into your shell or a private local environment file (never commit it). Required values include database passwords, a Google web client ID, a unique `APP_JWT_SECRET` of at least 32 UTF-8 bytes, and exact allowed browser origins. Set `APP_COOKIE_SECURE=false` only for local HTTP; production requires HTTPS and secure cookies. Use the frontend Vite proxy for same-site local auth cookies.
 
@@ -40,7 +40,7 @@ M04_MIGRATION_TEST_APP_PASSWORD='runtime-password' \
 mvn -Dtest=MigrationAndTenantIsolationTest test
 ```
 
-The migration integration test is enabled only when `M04_MIGRATION_TEST_DB_URL` is set; use a newly created, empty database because it expects to apply V1–V10. The CI job creates this database automatically. Inspect `target/surefire-reports` for actual counts.
+The migration integration test is enabled only when `M04_MIGRATION_TEST_DB_URL` is set; use a newly created, empty database because it expects to apply every migration from V1 onward. The CI job creates this database automatically. Inspect `target/surefire-reports` for actual counts.
 
 `AuthIntegrationTest` uses a local JWKS endpoint and real signed test tokens to exercise Google verification, staff admission, JWT validation, refresh replay/concurrency, cookie flags, logout, and Origin checks. Point it at a disposable database (the local app role must be restricted):
 
@@ -58,3 +58,5 @@ Frontend API client checks run with `cd frontend && npm ci && npm test && npm ru
 Hibernate `@TenantId` scopes tenant entities. `TenantFilter` obtains tenant identity only from the verified JWT principal. PostgreSQL RLS provides a second fail-closed layer through `app.clinic_id`, stamped/reset at connection checkout/return. Background tasks must wrap tenant work with `TenantContext.runAs` or `TenantContext.callAs`.
 
 Google sign-in accepts existing active staff only. Access tokens are short-lived and held in frontend memory. Rotating refresh tokens are random, hashed in PostgreSQL, HttpOnly, SameSite=Strict, path-scoped cookies. Reuse of a revoked refresh token revokes active sessions for that user in that clinic. No public registration is provided.
+
+Platform administrators use a separate Google sign-in at `/platform-admin/login`. `CLINIC_PLATFORM_ADMIN_EMAILS` is a comma-separated backend allowlist. Such sessions contain no `clinic_id`; the verified platform-admin principal sets the database platform context used by V11 for cross-clinic operations. The web client ID must match between backend `GOOGLE_CLIENT_ID` and frontend `VITE_GOOGLE_CLIENT_ID`.

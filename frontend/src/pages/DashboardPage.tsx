@@ -1,4 +1,5 @@
 import { useAuth } from '../auth/useAuth'
+import { Navigate } from 'react-router-dom'
 
 const MODULES = [
   { name: 'Calendar', note: 'Appointments by dentist and chair' },
@@ -12,6 +13,7 @@ const MODULES = [
 export function DashboardPage() {
   const { session, signOut } = useAuth()
   if (!session) return null
+  if (session.user.platformAdmin || !session.clinic) return <Navigate to="/platform-admin" replace />
 
   return (
     <div className="shell">

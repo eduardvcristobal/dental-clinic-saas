@@ -23,4 +23,11 @@ Final local Maven verification on JDK 17: **13 passed, 0 failed, 0 skipped**. Fr
 - Controlled test JWKS passed, but Google live provider/browser sign-in and production cookie behavior were not exercised.
 - GitHub Actions and automated secret/dependency scans have not yet run.
 
+## Subsequent platform-admin access update (2026-10-19)
+
+- Added `CLINIC_PLATFORM_ADMIN_EMAILS` allowlisting, Google identity verification, a tenantless `PLATFORM_ADMIN` JWT with no `clinic_id`, and clinic-independent refresh-token rotation/revocation. Refresh rechecks the allowlist; removing an email blocks future refreshes while an already-issued access token can remain valid for up to 10 minutes.
+- V11 adds a permissive RLS policy based on the server-stamped `app.platform_admin` context. The authenticated principal controls this flag through `TenantFilter`; ordinary clinic sessions stamp `false` and retain their existing tenant policies. Platform admin can read and write across clinic-scoped tables when backend endpoints execute under that context.
+- New API surface is limited to a read-only global clinic overview with staff/patient counts. No business CRUD APIs currently exist. Add explicit audit logging and revalidate authorization before exposing future write endpoints.
+- Backend compilation, frontend build, local migration/startup, and anonymous 401 protection were verified. No platform-admin automated tests or live Google browser sign-in were run. GitHub Actions remains deferred.
+
 Do not claim production or pilot readiness. M0.4 remains in progress until CI succeeds and remaining provider/browser checks are complete.

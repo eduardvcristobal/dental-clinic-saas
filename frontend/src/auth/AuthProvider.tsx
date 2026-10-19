@@ -1,7 +1,7 @@
 import { googleLogout } from '@react-oauth/google'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { loginWithGoogle, logout } from '../api/auth'
+import { loginPlatformAdminWithGoogle, loginWithGoogle, logout } from '../api/auth'
 import { refreshSession, setAccessToken, setSessionExpiredHandler } from '../api/client'
 import type { Session } from '../api/client'
 import { AuthContext } from './AuthContext'
@@ -43,6 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authenticated')
   }, [])
 
+  const signInAsPlatformAdmin = useCallback(async (idToken: string) => {
+    const s = await loginPlatformAdminWithGoogle(idToken)
+    setSession(s)
+    setStatus('authenticated')
+  }, [])
+
   const signOut = useCallback(async () => {
     try {
       await logout()
@@ -53,8 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clear])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, session, signInWithGoogle, signOut }),
-    [status, session, signInWithGoogle, signOut],
+    () => ({ status, session, signInWithGoogle, signInAsPlatformAdmin, signOut }),
+    [status, session, signInWithGoogle, signInAsPlatformAdmin, signOut],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

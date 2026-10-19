@@ -37,3 +37,11 @@
 ## Remaining verification
 
 The local database was PostgreSQL 18.6; the CI workflow targets PostgreSQL 16 but has not run yet. CI results, supported PostgreSQL 16 compatibility, restore/restart beyond the tested app restart, and broad CRUD isolation for future API modules remain to be verified. Do not use the local scratch databases for clinic data.
+
+## Subsequent local platform-admin update (2026-10-19)
+
+- Added forward-only V11, which adds an explicit RLS policy for trusted platform-admin requests and a clinic-independent refresh-session table.
+- The local `dental` database applied V11 successfully, and Spring Boot started with Hibernate schema validation. The migration integration test expectation was advanced to V11 but was not rerun for this update.
+- Platform-admin cross-clinic access is limited to the allowlisted JWT identity and is currently surfaced through a global clinic overview endpoint. Broader business CRUD endpoints do not yet exist.
+- The unauthenticated global clinic endpoint returned HTTP 401. The V11 `platform_admin_access` policy is present on all 27 tenant tables; no authenticated cross-clinic admin request has been exercised yet.
+- Test totals for the earlier M0.4 run remain 16 passed, 0 failed, 0 skipped, 0 blocked. V11/platform-admin test cases were not run.

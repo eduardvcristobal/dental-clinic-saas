@@ -55,7 +55,7 @@ class MigrationAndTenantIsolationTest {
     void migratesFreshSchemaAndEnforcesRlsAndTenantRelationshipsForRuntimeRole() throws Exception {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
-        assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+        assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity

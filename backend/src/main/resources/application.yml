@@ -26,5 +26,6 @@ app:
     # Exact browser origins permitted to make credentialed auth requests.
     allowed-origins: ${APP_ALLOWED_ORIGINS:}
     google-jwk-set-uri: ${GOOGLE_JWK_SET_URI:}
+    platform-admin-emails: ${CLINIC_PLATFORM_ADMIN_EMAILS:}
     login-requests-per-minute: ${APP_AUTH_LOGIN_RPM:10}
     refresh-requests-per-minute: ${APP_AUTH_REFRESH_RPM:30}
