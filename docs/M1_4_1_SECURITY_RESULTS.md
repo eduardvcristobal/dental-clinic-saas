@@ -1,6 +1,6 @@
 # M1.4.1 Security Regression Results
 
-**Status: application regression tests, browser suite and npm audit pass; OWASP NVD scan and live-provider gates remain open.**
+**Status: application regression tests, browser suite and npm audit are recorded as passing for M1.4.2; live-provider verification remains open. Maven NVD scan is DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION, not PASS.**
 
 ## Executed application security checks
 
@@ -15,13 +15,13 @@
 ## Dependency scanning
 
 - npm audit (this session, registry reachable): **0 vulnerabilities** — full dependency tree, including dev dependencies; metadata reports info/low/moderate/high/critical all zero. Re-run after the Playwright dependency was added.
-- OWASP Dependency-Check Maven 12.1.0: NVD catalog download (409,901 records) again did not complete within the session window; anonymous NVD API access is throttled without an API key. No Maven vulnerability count is claimed. The GitHub Actions workflow now carries an opt-in `owasp` job that runs automatically once an `NVD_API_KEY` secret and a `RUN_OWASP_SCAN=true` repository variable are configured.
-- GitHub Actions dependency review and secret scan: workflow configuration extended (browser evidence upload, opt-in OWASP). Still not executed remotely — no Git remote is configured.
+- OWASP Dependency-Check Maven 12.1.0: NVD update did not complete; no Maven vulnerability count is claimed. Per owner direction in M1.4.4, the assessment is **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10. This is not a PASS. Residual risk: applicable vulnerabilities in Maven dependencies have not been assessed. Before production deployment, complete the Maven assessment with current advisory data and document/remediate applicable high/critical findings.
+- GitHub Actions dependency review and secret scan: the workflow retains its security job and pull-request dependency review. A later commit (`07cc18f`) documents run 39232339581 as green, but its primary run metadata and logs are unavailable in this checkout; the assertion is **not independently verified**. No hosted secret-scan or dependency-review result is claimed by this report.
 
 ## Residual security gates
 
-1. Complete the OWASP NVD scan (needs an NVD API key or a longer window) and remediate any high/critical findings.
-2. Complete a real allowlisted Google login and confirm authorized origin/client configuration.
-3. Execute hosted CI after the owner enables/configures the remote.
+1. Complete a real allowlisted Google login and invitation acceptance with authorized test accounts in an isolated clinic.
+2. Verify run 39232339581 from authenticated primary evidence or execute hosted CI again and retain metadata/logs for the tested SHA and every job.
+3. Complete the deferred Maven vulnerability assessment in M10 and before production deployment; document findings and remediation.
 
 No secrets were copied into the repository. Google credentials were not used by the synthetic tests.

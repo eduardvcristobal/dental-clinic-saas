@@ -4,7 +4,7 @@
 **Source baseline:** `155387d` plus uncommitted M1.4.1 work  
 **Decision:** **M1 remains OPEN. Do not start M2 or enable real patient data.**
 
-The browser, responsive-layout and frontend-dependency gates that were previously blocked are now verified. The remaining open gates are live Google sign-in, the OWASP NVD scan and hosted CI.
+The synthetic browser, responsive-layout and frontend npm-dependency gates that were previously blocked are recorded as passing for M1.4.2. Live Google sign-in and invitation acceptance remain unverified. The Maven NVD scan is **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION**, not PASS; the hosted CI run claim is not independently verified. See the M1.4.4 report for the latest reconciliation.
 
 ## Acceptance summary
 
@@ -18,8 +18,8 @@ The browser, responsive-layout and frontend-dependency gates that were previousl
 | HTTP onboarding and invitation lifecycle | PASS | First owner, invitation acceptance, replay, revocation/expiry, dentist profile, audit event and concurrent claim integration tests |
 | Platform Admin authorization | PASS (HTTP + browser) | Directory-only data, clinical API denied; browser asserts no patient/clinical text on the admin screen |
 | npm dependency advisory review | **PASS (was BLOCKED)** | `npm audit` on the current tree: 0 vulnerabilities (0 info/low/moderate/high/critical) |
-| OWASP dependency scan | OPEN | NVD catalog download (409,901 records) again incomplete without an API key; opt-in CI job added for when `NVD_API_KEY` exists |
-| Hosted CI | **PASS (was BLOCKED)** | Remote `github.com/eduardvcristobal/dental-clinic-saas` configured; workflow runs green — run 39232339581: java17 (Maven verify, PostgreSQL 16), frontend (build/lint/24 tests), browser (3/3 Playwright), security (gitleaks clean); OWASP job opt-in. Run URL: https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39232339581 |
+| OWASP dependency scan | **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** | No Maven vulnerability result. Deferred to M10; completed Maven assessment and high/critical finding disposition required before production deployment. The optional workflow job remains available. |
+| Hosted CI | **NOT VERIFIED — conflicting record** | Commit `07cc18f` asserts run `39232339581` was green, but the run metadata, tested commit SHA, job results, and artifacts are unavailable in this checkout. Local `gh` authentication is invalid, GitHub API access failed, and the run page is not publicly accessible. The previous green claim is therefore unverified, not accepted as evidence. |
 
 ## Root cause correction for the earlier browser failures
 
@@ -36,7 +36,7 @@ Additional product/test hardening done while making the suite green: refresh/log
 - Frontend: `npm test` — **24 passed**; `npm run lint` — no warnings; `npm run build` — production build OK.
 - Browser: `npm run test:e2e` — **3 passed** (twice consecutively); evidence screenshots and traces written to `docs/evidence/m1_4_1/`.
 - `npm audit` — 0 vulnerabilities on the current tree.
-- OWASP dependency-check 12.1.0 — NVD download (409,901 records) started but not completed anonymously; no result claimed.
+- OWASP dependency-check 12.1.0 — NVD download (409,901 records) started but not completed anonymously. As of M1.4.4 this is formally **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10, not PASS; no Maven vulnerability count is claimed.
 - Workflow YAML validated after edits.
 
 ## Current test totals
@@ -45,7 +45,7 @@ Additional product/test hardening done while making the suite green: refresh/log
 - Frontend unit: **24 passed, 0 failed, 0 skipped**.
 - Browser E2E: **3 passed, 0 failed**.
 - **Combined: 57 passed, 0 failed.**
-- Hosted CI: **not run** (no remote configured).
+- Hosted CI run 39232339581: **claimed in commit 07cc18f, not independently verified**. The repo has an `origin`, but local GitHub credentials are invalid and network DNS/API access is unavailable. Job list, exact head SHA, and test results cannot be confirmed from primary run evidence.
 - Live Google sign-in: **not run** (no credentials available).
 
 ## Google sign-in live check — exactly what is missing
@@ -57,13 +57,13 @@ The code paths are complete and verified by tests: the backend (`GoogleIdentityV
 3. One authorized Google account invited as an active staff member (or allowlisted as Platform Admin) in the clinic under test.
 4. A browser signed into that account to complete the consent flow.
 
-None of these can be created or accessed from here; performing the check requires the owner's Google Cloud session.
+Those were the prerequisites recorded at the earlier M1.4.2 checkpoint. The owner has since indicated that a second authorized test account can be used, but its invitation email has not yet been supplied. The real login/invitation flow has still not been executed; see `M1_4_4_FINAL_ACCEPTANCE_REPORT.md` for the current state.
 
 ## Remaining blockers and recommendation
 
-1. Perform the live Google sign-in smoke test once the owner supplies the configured client ID and an authorized test account; record only non-secret outcome evidence.
-2. Finish the OWASP NVD scan with an API key (CI job is ready; set `NVD_API_KEY` and `RUN_OWASP_SCAN=true`) and remediate any high/critical findings.
-3. Configure a Git remote and run the CI workflow (Java 17 + PostgreSQL 16 + frontend + browser + secret/dependency review) without bypassing required checks.
-4. Re-run the M1 acceptance checklist. Keep M2 blocked until every gate passes.
+1. Perform live Google sign-in and invitation acceptance with authorized test accounts in a disposable clinic; record only sanitized outcome evidence.
+2. Obtain the original run record/logs for 39232339581 or rerun hosted CI and retain run metadata, exact SHA, all job outcomes, and artifacts.
+3. Complete the deferred Maven OWASP assessment in M10 and before any production deployment; classify findings and remediate applicable high/critical issues.
+4. Re-run the M1 acceptance checklist. Keep M2 blocked until required functional and CI evidence is reconciled.
 
-No push was performed. No real Google credential or patient data was used.
+No Google account flow or patient data was used in the M1.4.2 browser suite; its network was mocked. This report does not assert real Google authentication or invitation delivery/acceptance.

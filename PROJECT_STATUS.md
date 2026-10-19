@@ -95,9 +95,9 @@
 
 Detailed evidence: [runtime report](docs/M0_4_RUNTIME_VALIDATION_REPORT.md), [database report](docs/M0_4_DATABASE_VALIDATION_REPORT.md), [security report](docs/M0_4_SECURITY_REGRESSION_REPORT.md).
 
-## Next recommended task
+## Historical next recommendation at M0.4 (superseded)
 
-Complete a live Google sign-in smoke check at `/platform-admin/login` (after confirming `http://localhost:5173` is an authorized JavaScript origin). Then begin **M1 — Clinic & Branch Management**. GitHub Actions remains deferred per owner direction; run hosted CI when the owner is ready.
+At the M0.4 checkpoint, the recommendation was to complete a live Google smoke check and then begin M1. That recommendation is superseded: M1 is in progress and remains open pending the M1.4.4 gates below.
 
 ## Change log
 
@@ -219,7 +219,7 @@ See [validation report](docs/M1_4_VALIDATION_REPORT.md), [final regression repor
 
 ## Next recommended task
 
-Finish M1 acceptance: authorize and run a real Google sign-in smoke check, then execute local browser onboarding and invitation concurrency against a disposable database, save responsive UI evidence, and run hosted CI when an authorized remote/branch is configured. Keep M2 blocked until all acceptance gates pass.
+Finish M1 acceptance by completing live Google login/invitation acceptance with authorized test accounts and reconciling hosted run evidence. Keep M2 blocked until required functional and CI evidence is verified. Complete the deferred Maven vulnerability assessment before production deployment; deferral does not establish security clearance.
 
 ## M1.4 local validation update (2026-10-19)
 
@@ -231,7 +231,7 @@ Finish M1 acceptance: authorize and run a real Google sign-in smoke check, then 
 
 Final gate checklist: [docs/M1_4_ACCEPTANCE_CHECKLIST.md](docs/M1_4_ACCEPTANCE_CHECKLIST.md).
 
-## M1.4.1 final acceptance closure attempt (2026-10-19)
+## M1.4.1 final acceptance closure attempt (historical snapshot; superseded by M1.4.2–M1.4.4)
 
 **Status: M1 remains OPEN.** Automated server and database gates pass locally. Live provider sign-in, hosted CI, complete browser E2E, and current dependency advisory review are not certified.
 
@@ -249,7 +249,7 @@ M1.4.1 successful automated totals: **47 passed, 0 failed, 0 skipped** (30 backe
 
 See the detailed certification, browser and security results in `docs/M1_4_1_FINAL_CERTIFICATION_REPORT.md`, `docs/M1_4_1_E2E_RESULTS.md`, and `docs/M1_4_1_SECURITY_RESULTS.md`.
 
-## M1.4.2 blocker resolution (2026-10-19, later)
+## M1.4.2 blocker resolution (2026-10-19, later; point-in-time record)
 
 **Status: M1 remains OPEN** — but the browser, responsive-layout, frontend-dependency gates moved from BLOCKED to PASS, and the earlier browser-failure diagnosis was corrected.
 
@@ -262,21 +262,36 @@ See the detailed certification, browser and security results in `docs/M1_4_1_FIN
 - [x] GitHub Actions workflow extended (browser job with evidence upload; opt-in OWASP job gated on an `NVD_API_KEY` secret) and YAML-validated.
 - [ ] Real Google sign-in and invitation acceptance with authorized test accounts: still blocked — no OAuth client ID, `frontend/.env`, authorized-origin access or test accounts exist in this environment. Exact requirements listed in the certification report.
 - [ ] OWASP dependency-check: NVD catalog (409,901 records) still not downloadable anonymously in the available window; no Maven vulnerability count claimed. Opt-in CI job is ready for when an `NVD_API_KEY` exists.
-- [ ] Hosted CI: still unrun — no Git remote is configured; nothing was pushed.
+- [ ] Hosted CI at this M1.4.2 checkpoint: still unrun — no Git remote was configured at that checkpoint; nothing was pushed.
 
-M1.4.2 totals: **57 passed, 0 failed, 0 skipped** (30 backend + 24 frontend + 3 browser). **Still-open gates: live Google sign-in, OWASP NVD scan, hosted CI. Do not start M2 or use real patient data.**
+M1.4.2 totals: **57 passed, 0 failed, 0 skipped** (30 backend + 24 frontend + 3 browser), as recorded at that checkpoint. The Maven NVD scan was incomplete then and was formally deferred in M1.4.4; it remains a production security gate. **Still-open M1 gates include live Google sign-in/invitation acceptance and verified hosted CI evidence. Do not start M2 or use real patient data.**
 
 See the detailed certification, browser and security results in `docs/M1_4_1_FINAL_CERTIFICATION_REPORT.md`, `docs/M1_4_1_E2E_RESULTS.md`, and `docs/M1_4_1_SECURITY_RESULTS.md`.
 
-## M1.4.3 — External integration certification handoff (2026-10-19)
+## M1.4.3 — External integration certification handoff (2026-10-19; reconciled in M1.4.4)
 
-**Status: BLOCKED / NOT CERTIFIED. M1 OPEN; M2 and real patient data remain blocked.**
+**Status at the M1.4.3 handoff: BLOCKED / NOT CERTIFIED. M1 OPEN; M2 and real patient data remain blocked.** The hosted-run assertion added later in commit `07cc18f` conflicts with this handoff and cannot be independently verified from the currently available run evidence; see M1.4.4.
 
 - [x] Reviewed M1.4.2 external certification prerequisites and added read-only preflight script.
 - [x] Hardened optional GitHub Actions OWASP scan to fail closed on missing NVD key or scanner errors, with CVSS >= 7 failure threshold.
 - [ ] Actual live Google OAuth sign-in and invitation-acceptance evidence (requires authorized OAuth client and test identities).
-- [ ] Current completed Maven OWASP advisory scan (requires NVD access/key).
-- [ ] Hosted CI success evidence (requires authorized Git remote and Actions run).
+- [ ] Current Maven OWASP advisory scan (then required NVD access/key; formally deferred by accepted exception in M1.4.4).
+- [ ] Hosted CI success evidence (an `origin` remote is configured now; run 39232339581 is documented but its metadata, jobs, SHA, and results have not been independently verified).
 - [ ] Independent Java 17/PostgreSQL/full end-to-end certification, final acceptance signoff and M1 closure.
 
 See `docs/M1_4_3_EXTERNAL_CERTIFICATION_REPORT.md`. Previous M1.4.2 reports recorded 57 passing tests; **none were rerun in this handoff**.
+
+## M1.4.4 — NVD deferral and final acceptance reconciliation (2026-10-19)
+
+**Status: M1 OPEN. M2 is not started. The application is not production-ready.**
+
+- [x] Owner accepted deferral of the OWASP Maven/NVD scan to M10 — Production Security Hardening. Status is **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION**, never PASS. Maven dependency exposure is unassessed; a completed Maven vulnerability assessment and disposition of applicable findings is required before production deployment.
+- [x] Kept the optional `owasp` GitHub Actions job and all existing test/security jobs, dependency review, and secret scanning unchanged.
+- [x] Updated `scripts/m1_4_3_preflight.sh`: absent `NVD_API_KEY` emits an advisory and does not set the preflight failure flag. Other prerequisites still determine the exit result.
+- [x] Reconciled run 39232339581: commit `07cc18f` and the checklist assert a green run, but no primary run record, job logs, artifact, or exact head SHA is available locally. `gh auth status` reports an invalid credential; GitHub API access and `git ls-remote` failed due unavailable network/DNS; unauthenticated run URL returned 404. Current `origin` is configured. CI status is **NOT VERIFIED**, not PASS.
+- [ ] Real Google sign-in and staff invitation acceptance with two authorized accounts in an isolated clinic: pending recipient account address/session and an executable local OAuth/browser setup. No authentication token or credential was logged or recorded.
+- [ ] Hosted CI: obtain authenticated run record/logs for 39232339581 or run CI again with evidence capture.
+
+M1.4.2's recorded local suite totals remain 30 backend + 24 frontend + 3 browser = **57 passed**; these are prior-run records and were not rerun for M1.4.4. Real provider/invitation verification and hosted CI evidence remain open. The NVD scan is deferred by an owner-accepted exception and is a production blocker, not an M1 development preflight blocker. Keep M1 open; do not start M2 or use real patient data.
+
+See [M1.4.4 final acceptance report](docs/M1_4_4_FINAL_ACCEPTANCE_REPORT.md), [reconciled checklist](docs/M1_4_ACCEPTANCE_CHECKLIST.md), and [M1.4.3 evidence handoff](docs/M1_4_3_EXTERNAL_CERTIFICATION_REPORT.md).

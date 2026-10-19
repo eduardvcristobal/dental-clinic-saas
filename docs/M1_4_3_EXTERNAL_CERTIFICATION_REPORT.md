@@ -1,23 +1,24 @@
-# M1.4.3 — External Integration & Certification Closure
+# M1.4.3 — External Integration & Certification Handoff
 
-**Status: BLOCKED — M1 remains OPEN and M2/real patient data remain blocked.**
+**Reconciled in M1.4.4. M1 remains OPEN; M2 and production use remain blocked.**
 
-## Evidence at hand
+## Work recorded for M1.4.3
 
-The M1.4.2 archive records 30 backend, 24 frontend unit, and 3 Playwright checks passing (57 total), a clean npm audit, and isolated PostgreSQL migration/RLS checks. These results were **not rerun** during this handoff. The source archive's Git history has no configured remote. No live Google ID token, Google test account, NVD API key, or hosted CI execution evidence was supplied.
+- Added `scripts/m1_4_3_preflight.sh` to report external prerequisites without printing credential values.
+- Hardened the optional GitHub Actions OWASP job to require its NVD API key when explicitly enabled, fail on scanner errors, and use CVSS 7 as its threshold.
+- Preserved the workflow's other security checks, dependency review, and secret scanning.
 
-## M1.4.3 changes
+## Evidence reconciliation
 
-- Added `scripts/m1_4_3_preflight.sh`, a read-only environment prerequisite check that never prints credentials.
-- Updated the opt-in OWASP Actions job to fail when the required NVD key is missing, fail when the scan itself errors, and gate on CVSS >= 7. This avoids reporting a green advisory scan when NVD data cannot be loaded.
+The M1.4 acceptance checklist and a later edit in commit `07cc18f` assert that GitHub Actions run `39232339581` succeeded. However, this checkout contains no run JSON, downloaded logs, or run artifacts that independently establish its exact head SHA, job list, or test results. The local `gh` credential is invalid; the `gh run view` request could not reach GitHub's API; unauthenticated access to the run page returned 404; and `git ls-remote` failed due DNS resolution. The repository's `origin` remote is configured, contrary to the earlier M1.4.3 statement that no remote existed.
 
-## Required external completion evidence
+**Disposition:** run 39232339581 is **DOCUMENTED BUT NOT VERIFIED**. Do not count its reported jobs or green status as acceptance evidence until an authenticated run record or downloadable logs/artifacts are available. No new hosted run was triggered in M1.4.4.
 
-1. **Live Google sign-in:** authorized OAuth Web client, origin matching the actual frontend URL, identical frontend/backend audience, an authorized test account, and a successful real login + accepted invitation in a disposable clinic. Capture sanitized browser and API result logs; no ID tokens or secrets in evidence.
-2. **Maven dependency advisories:** current successful OWASP scan with NVD update, generated report, dated vulnerability decisions for high/critical items, and no unresolved applicable high/critical findings. A scanner download failure is BLOCKED, not PASS.
-3. **Hosted GitHub Actions:** authorized private Git remote, workflow run URL/ID, completed Java 17/PostgreSQL 16/frontend/Playwright/security jobs, and downloaded logs/artifact manifest. The optional OWASP job must be explicitly enabled with `RUN_OWASP_SCAN=true` and the secret `NVD_API_KEY` supplied.
-4. **Final:** rerun impacted tests, update the acceptance checklist and `PROJECT_STATUS.md`, commit results and deliver new packages. No M1 certification until every gate is evidenced.
+## External gates as of M1.4.4
 
-## Environment limitations in this execution
+- Live Google sign-in and staff invitation acceptance: not yet evidenced with authorized accounts and an isolated clinic.
+- Maven OWASP/NVD assessment: formally **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10. It is not PASS. Record the unassessed Maven dependency risk; a completed Maven vulnerability assessment and disposition of applicable findings is mandatory before production deployment.
+- Hosted CI: reported run unresolved as described above.
+- Earlier M1.4.2 local totals (30 backend, 24 frontend, 3 browser) are prior-run evidence, not tests executed in M1.4.3.
 
-No configured Git remote and no OAuth or NVD credentials were available. Java 17, Maven and an isolated PostgreSQL database were also not provided in this execution environment. No remote changes or external authentication were attempted. The M1.4.2 passing test totals must not be attributed to this M1.4.3 run.
+See `docs/M1_4_4_FINAL_ACCEPTANCE_REPORT.md` for the reconciliation record.

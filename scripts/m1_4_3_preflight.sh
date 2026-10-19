@@ -6,7 +6,11 @@ failed=0
 check() { if "$@" >/dev/null 2>&1; then printf 'READY   %s\n' "$1"; else printf 'BLOCKED %s\n' "$1"; failed=1; fi; }
 command -v git >/dev/null 2>&1 || { echo 'BLOCKED git'; exit 1; }
 if git remote | grep -q .; then echo 'READY   Git remote configured'; else echo 'BLOCKED Git remote missing (hosted CI not run)'; failed=1; fi
-if [ -n "${NVD_API_KEY:-}" ]; then echo 'READY   NVD_API_KEY present'; else echo 'BLOCKED NVD_API_KEY missing (Maven advisory scan)'; failed=1; fi
+if [ -n "${NVD_API_KEY:-}" ]; then
+  echo 'ADVISORY NVD_API_KEY is present, but no Maven scan is implied; the OWASP NVD assessment is deferred to M10 by owner-accepted security exception.'
+else
+  echo 'ADVISORY OWASP NVD Maven scan deferred to M10 — Production Security Hardening (owner-accepted security exception); this is not a PASS and does not block M1 development preflight.'
+fi
 if [ -n "${GOOGLE_CLIENT_ID:-}" ] && [ -n "${VITE_GOOGLE_CLIENT_ID:-}" ] && [ "$GOOGLE_CLIENT_ID" = "$VITE_GOOGLE_CLIENT_ID" ]; then
   echo 'READY   Frontend/backend Google OAuth client IDs match'
 else

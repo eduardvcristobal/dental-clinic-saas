@@ -3,7 +3,7 @@
 **Date:** 2026-10-19
 **Base commit:** `155387d` (docs(m1.4): record browser smoke console warning) + uncommitted M1.4.1 work preserved
 **Head commit:** `05c8488` — fix(m1.4.2): certify browser suite, harden tenant/GSI/mobile defects, refresh gates (a docs-only manifest commit follows it)
-**Branch:** `main` (local only; no remote configured, nothing pushed)
+**Branch:** `main`; at the M1.4.2 archive checkpoint no remote was configured and nothing was pushed. A later commit `07cc18f` records a hosted-run claim; M1.4.4 could not independently verify that run from primary evidence.
 
 ## Archives
 
@@ -33,5 +33,5 @@
 ## Remaining open gates (M1 stays open)
 
 1. Live Google sign-in / invitation acceptance with an authorized OAuth client ID and test account.
-2. OWASP NVD scan completion (set `NVD_API_KEY` + `RUN_OWASP_SCAN=true` in the CI repository for the prepared job).
-3. Hosted CI run once a remote exists.
+2. OWASP NVD scan is **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10, not PASS; complete a Maven vulnerability assessment before production deployment.
+3. Verify run 39232339581 from authenticated primary evidence, or rerun hosted CI and retain run metadata/logs/artifacts.
