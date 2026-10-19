@@ -215,6 +215,7 @@ test('Google Identity initializes once while navigating between login screens', 
   await expect(page.getByRole('heading', { name: 'Platform administration' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible()
   await page.getByRole('link', { name: 'Clinic staff sign in' }).click()
+  await page.getByLabel('Clinic code').fill('synthetic-clinic')
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible()
   expect(await page.evaluate(() => (window as unknown as { __gsiInitCount?: number }).__gsiInitCount)).toBe(1)
 })

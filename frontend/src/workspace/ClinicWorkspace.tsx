@@ -8,10 +8,6 @@ import { WORKSPACE_MODULES, DISPLAY_ROLES, canSeeModule, type WorkspaceRole } fr
 import './workspace.css'
 import { JourneyPreview } from './JourneyPreview'
 import { ModuleStatusPreview } from './ModuleStatusPreview'
-import { moduleDecision } from './governance'
-
-type Tooth = { n: number; condition: string }
-const teeth: Tooth[] = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28,48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38].map(n => ({ n, condition: [16, 26].includes(n) ? 'Restoration (demo)' : n === 36 ? 'Suspected caries (demo)' : n === 48 ? 'Missing (demo)' : 'No recorded finding (demo)' }))
 const schedule = [
   { time: '09:00', patient: 'Maria Santos', activity: 'Cleaning & examination', dentist: 'Dr. Reyes', chair: 'Chair 1', status: 'Arrived' },
   { time: '10:30', patient: 'Jose Cruz', activity: 'Composite restoration', dentist: 'Dr. Lim', chair: 'Chair 2', status: 'Confirmed' },
@@ -46,8 +42,7 @@ function Patient360({ role }: { role: WorkspaceRole }) {
   const selectedId = params.get('patient')
   useEffect(() => {
     let live=true
-    if(!selectedId){setPatient(null);return}
-    setPatient(null) // Never display the previous patient while a new record is being authorized.
+    if(!selectedId)return
     setError('')
     setLoading(true)
     void api<Patient>(`/api/patients/${encodeURIComponent(selectedId)}`).then(p=>{if(live){setPatient(p);setError('')}}).catch(e=>{if(live){setPatient(null);setError(e instanceof Error?e.message:'Patient not available')}}).finally(()=>{if(live)setLoading(false)})

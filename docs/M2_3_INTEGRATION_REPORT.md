@@ -16,16 +16,10 @@
 - Existing M2.2 clinical authorization checks restrict medical history to OWNER/ADMIN/DENTIST; Front Desk remains limited to appropriate nonclinical data.
 - Use synthetic identities only until clinical privacy and release acceptance are completed.
 
-## Verification performed in this environment
+## M2.5 verification (2026-10-19)
+- One authenticated Chromium Playwright test exercised the real backend and PostgreSQL, created a synthetic patient, opened its Patient 360° record, and checked delayed rapid switching and a foreign-clinic deep link.
+- The mocked UI suite passed 12/12 tests across Chromium, Firefox, and WebKit, including desktop, tablet, and mobile viewport layouts. These mocked tests are separate from the authenticated live-backend result.
+- Java API integration and PostgreSQL tests passed cross-clinic patient/care access checks; foreign UUIDs return 404 and Front Desk medical-history access returns 403.
+- The workspace shows only the selected patient’s clinic record; the incomplete tabs remain previews. No fictional clinical content is attached to the live synthetic patient.
 
-- Git source diff and source file structure reviewed.
-- **NOT EXECUTED:** Java 17 Maven compile/tests, PostgreSQL migrations V1–V15 and restricted-role isolation, npm production build/lint/Vitest, authenticated Playwright E2E. The environment lacks Maven, Java 17, PostgreSQL and installed frontend dependencies.
-
-## Required acceptance suite for local agent
-
-1. On a clean PostgreSQL 16/18 test database, run Flyway V1–V15 and upgrade tests; verify guardian and consent RLS with restricted role across two clinics.
-2. On JDK 17 execute `mvn clean verify` and check medical history denial to FRONT_DESK and cross-clinic UUID requests on all patient-care endpoints.
-3. In frontend execute `npm ci`, `npm run lint`, `npm run test`, `npm run build`, and `npm run test:e2e` with authenticated synthetic test accounts.
-4. Browser: search/select a patient, deep link to `/workspace/patient-360?patient=<uuid>`, reload, edit/history if permitted, switch tabs, change patients, verify Front Desk never sees clinical details, verify unknown/foreign UUID does not render previous data.
-5. Validate minor/guardian/contact interactions and consent state transitions; leave signing and legal authority explicitly incomplete.
-6. Update `PROJECT_STATUS.md` with actual counts, fix failures, and keep M2.3 open until evidence is available.
+The live E2E uses ephemeral test signing keys and synthetic account identities, not real Google credentials. Hosted CI was not accessible from this run; see the M2.5 acceptance report. M2 remains open pending hosted CI evidence.

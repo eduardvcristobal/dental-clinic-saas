@@ -55,7 +55,7 @@ class MigrationAndTenantIsolationTest {
     void migratesFreshSchemaAndEnforcesRlsAndTenantRelationshipsForRuntimeRole() throws Exception {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
-        assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14");
+        assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
@@ -65,17 +65,25 @@ class MigrationAndTenantIsolationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND policyname='platform_admin_access'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='staff_invitation' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='clinic_admin_event' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='patient_guardian_contact'::regclass", Boolean.class)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename IN ('patient_medical_history','patient_guardian_contact','consent_form') AND policyname='tenant_isolation'", Integer.class)).isEqualTo(3);
 
         UUID clinicA = UUID.randomUUID(), clinicB = UUID.randomUUID();
-        UUID userB = UUID.randomUUID();
+        UUID userA = UUID.randomUUID(), userB = UUID.randomUUID();
+        UUID patientA = UUID.randomUUID(), patientB = UUID.randomUUID();
+        UUID guardianA = UUID.randomUUID(), guardianB = UUID.randomUUID();
+        UUID consentA = UUID.randomUUID(), consentB = UUID.randomUUID();
         try (Connection owner = ownerConnection(); var s = owner.createStatement()) {
             s.execute("GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO dental_app");
             s.execute("GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO dental_app");
             s.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO dental_app");
             s.execute("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE,SELECT ON SEQUENCES TO dental_app");
             s.execute("INSERT INTO clinic(id,slug,name) VALUES ('"+clinicA+"','m04-a','Clinic A'),('"+clinicB+"','m04-b','Clinic B')");
-            s.execute("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role) VALUES (gen_random_uuid(),'"+clinicA+"','a@test.invalid','x','User A','OWNER'),('"+userB+"','"+clinicB+"','b@test.invalid','x','User B','OWNER')");
-            s.execute("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (gen_random_uuid(),'"+clinicA+"','A1','Patient','A'),(gen_random_uuid(),'"+clinicB+"','B1','Patient','B')");
+            s.execute("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role) VALUES ('"+userA+"','"+clinicA+"','a@test.invalid','x','User A','OWNER'),('"+userB+"','"+clinicB+"','b@test.invalid','x','User B','OWNER')");
+            s.execute("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES ('"+patientA+"','"+clinicA+"','A1','Patient','A'),('"+patientB+"','"+clinicB+"','B1','Patient','B')");
+            s.execute("INSERT INTO patient_medical_history(clinic_id,patient_id,allergies,updated_by) VALUES ('"+clinicA+"','"+patientA+"','Synthetic allergy A','"+userA+"'),('"+clinicB+"','"+patientB+"','Synthetic allergy B','"+userB+"')");
+            s.execute("INSERT INTO patient_guardian_contact(id,clinic_id,patient_id,full_name,relationship,is_primary) VALUES ('"+guardianA+"','"+clinicA+"','"+patientA+"','Guardian A','Parent',true),('"+guardianB+"','"+clinicB+"','"+patientB+"','Guardian B','Parent',true)");
+            s.execute("INSERT INTO consent_form(id,clinic_id,patient_id,form_type) VALUES ('"+consentA+"','"+clinicA+"','"+patientA+"','Synthetic form A'),('"+consentB+"','"+clinicB+"','"+patientB+"','Synthetic form B')");
         }
 
         try (Connection app = appConnection()) {
@@ -87,7 +95,16 @@ class MigrationAndTenantIsolationTest {
                 try (var rs = s.executeQuery("SELECT count(*) FROM patient WHERE clinic_id='"+clinicB+"'")) { rs.next(); assertThat(rs.getInt(1)).isZero(); }
                 s.execute("DELETE FROM patient WHERE clinic_id='"+clinicB+"'");
                 try (var rs = s.executeQuery("SELECT clinic_id FROM patient LIMIT 1")) { rs.next(); assertThat(rs.getObject(1, UUID.class)).isEqualTo(clinicA); }
-                assertThrows(SQLException.class, () -> s.execute("INSERT INTO patient(clinic_id,chart_no,first_name,last_name) VALUES ('"+clinicB+"','spoof','Spoof','Patient')"));
+                assertSqlRejected(app, s, "INSERT INTO patient(clinic_id,chart_no,first_name,last_name) VALUES ('"+clinicB+"','spoof','Spoof','Patient')");
+                try (var rs=s.executeQuery("SELECT count(*) FROM patient_medical_history WHERE patient_id='"+patientB+"'")) {rs.next();assertThat(rs.getInt(1)).isZero();}
+                try (var rs=s.executeQuery("SELECT count(*) FROM patient_guardian_contact WHERE id='"+guardianB+"'")) {rs.next();assertThat(rs.getInt(1)).isZero();}
+                try (var rs=s.executeQuery("SELECT count(*) FROM consent_form WHERE id='"+consentB+"'")) {rs.next();assertThat(rs.getInt(1)).isZero();}
+                assertThat(s.executeUpdate("UPDATE patient_medical_history SET allergies='spoof' WHERE clinic_id='"+clinicB+"'")).isZero();
+                assertThat(s.executeUpdate("DELETE FROM patient_guardian_contact WHERE clinic_id='"+clinicB+"'")).isZero();
+                assertThat(s.executeUpdate("UPDATE consent_form SET form_type='spoof' WHERE clinic_id='"+clinicB+"'")).isZero();
+                assertSqlRejected(app, s, "INSERT INTO patient_guardian_contact(clinic_id,patient_id,full_name,relationship) VALUES ('"+clinicA+"','"+patientB+"','Cross Clinic','Parent')");
+                assertSqlRejected(app, s, "INSERT INTO patient_medical_history(clinic_id,patient_id,updated_by) VALUES ('"+clinicA+"','"+patientB+"','"+userA+"')");
+                assertSqlRejected(app, s, "INSERT INTO consent_form(clinic_id,patient_id,form_type) VALUES ('"+clinicA+"','"+patientB+"','Cross Clinic')");
             }
             app.rollback();
         }
@@ -150,5 +167,12 @@ class MigrationAndTenantIsolationTest {
     private Connection appConnection() throws SQLException {
         return DriverManager.getConnection(System.getenv("M04_MIGRATION_TEST_DB_URL"), "dental_app",
                 System.getenv("M04_MIGRATION_TEST_APP_PASSWORD"));
+    }
+
+    private void assertSqlRejected(Connection connection, java.sql.Statement statement, String sql) throws SQLException {
+        var savepoint = connection.setSavepoint();
+        assertThrows(SQLException.class, () -> statement.execute(sql));
+        connection.rollback(savepoint);
+        connection.releaseSavepoint(savepoint);
     }
 }

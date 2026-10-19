@@ -13,9 +13,11 @@
 - Before patient data use: run Java 17 build/tests, PostgreSQL RLS + two-clinic CRUD tests, frontend tests/build, Playwright coverage and privacy review.
 - No production patient data authorized; use synthetic records for evaluation.
 
-## Execution results (this environment)
-- `git diff --check`: passed.
-- `npm ci --offline`: BLOCKED (`why-is-node-running@3.2.1` absent from local cache).
-- Java 17 and Maven are unavailable; Spring build and newly authored controller tests are NOT EXECUTED.
-- PostgreSQL database unavailable; no fresh RLS or cross-clinic tests executed.
-- Frontend production build and Playwright E2E NOT EXECUTED.
+## M2.5 regression evidence (2026-10-19)
+- Java 17.0.20 Maven clean verification passed: the full backend suite passed 53/53, including authenticated HTTP patient CRUD, duplicate candidates, archive, stale/concurrent edits, tenant scoping, and audit assertions.
+- PostgreSQL 18.6 fresh V1–V15 migration/RLS validation passed using a restricted NOSUPERUSER NOBYPASSRLS application role and synthetic two-clinic patients.
+- The V14→V15 upgrade preserved patient history and legacy consent fields; see docs/M2_5_POSTGRESQL_TENANT_ISOLATION.md for the legacy consent semantics caveat.
+- Authenticated local Playwright with a synthetic Google JWKS and disposable PostgreSQL passed patient creation, search, duplicate review, edit, guardian, medical history, consent acknowledgement, archive, Patient 360°, cross-clinic denial, and delayed patient-switch checks.
+- Duplicate candidate detection remains advisory. No automatic merges or uniqueness constraint are enabled because legitimate twins and same-name/same-date records need staff review.
+
+See the final M2.5 reports and sanitized evidence files under docs/evidence/m2_5/.

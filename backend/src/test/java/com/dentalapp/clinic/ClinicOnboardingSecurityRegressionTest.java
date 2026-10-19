@@ -16,6 +16,14 @@ import static org.mockito.Mockito.*;
 
 /** Fast negative tests. Full replay/concurrency require restricted-role PostgreSQL integration. */
 class ClinicOnboardingSecurityRegressionTest {
+    @Test void onboardingIdentityAndInvitationTokensAreRedactedFromStringRepresentations() {
+        String identity="synthetic-google-identity";
+        String invite="synthetic-invitation-secret";
+        assertFalse(new ClinicOnboardingController.CreateClinic(identity,"clinic","Clinic","UTC","Main","Owner").toString().contains(identity));
+        assertFalse(new ClinicOnboardingController.Accept(identity,invite,"Staff").toString().contains(identity));
+        assertFalse(new ClinicOnboardingController.Accept(identity,invite,"Staff").toString().contains(invite));
+        assertFalse(new ClinicOnboardingController.InvitationCreated(java.util.UUID.randomUUID(),invite,"expiry").toString().contains(invite));
+    }
     JdbcTemplate db = mock(JdbcTemplate.class);
     GoogleIdentityVerifier google = mock(GoogleIdentityVerifier.class);
     PlatformTransactionManager manager = mock(PlatformTransactionManager.class);

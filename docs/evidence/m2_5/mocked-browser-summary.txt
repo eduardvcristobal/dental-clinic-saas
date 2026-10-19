@@ -1,0 +1,5 @@
+M2.5 mocked browser evidence (sanitized)
+Command: PLAYWRIGHT_ALL_BROWSERS=true npm run test:e2e -- --config=playwright.config.ts
+Result: 12 passed, 0 failed, 0 skipped across Chromium, Firefox and WebKit.
+The 4 existing mocked scenarios ran under each browser project. The workspace route scenario exercised desktop (1440x1000), tablet (820x1180), and mobile (390x844) viewports.
+All backend calls in this suite were intercepted; this result is not the live-backend E2E.

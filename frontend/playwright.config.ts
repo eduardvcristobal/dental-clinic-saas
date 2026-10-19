@@ -11,16 +11,22 @@ import { defineConfig } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
+  testMatch: 'm1_4_1.spec.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 90_000,
   expect: { timeout: 10_000 },
   reporter: [['list']],
   outputDir: './test-results',
+  projects: process.env.PLAYWRIGHT_ALL_BROWSERS === 'true' ? [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    { name: 'firefox', use: { browserName: 'firefox' } },
+    { name: 'webkit', use: { browserName: 'webkit' } },
+  ] : [{ name: 'chromium', use: { browserName: 'chromium' } }],
   use: {
     baseURL: 'http://127.0.0.1:5174',
     headless: true,
-    // The bundled Chromium, not a system Chrome, so local runs and CI exercise the same binary.
+    // Browser projects pin Playwright-managed engines so local runs and CI exercise the same binaries.
     trace: 'on',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

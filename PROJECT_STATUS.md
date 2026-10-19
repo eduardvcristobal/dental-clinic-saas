@@ -1,19 +1,14 @@
-## M2.1 — Patient Registry, Demographics & Search (implementation; validation pending)
-- [x] Tenant-scoped patient CRUD API and archive endpoint.
-- [x] Search by chart number, name, phone; bounded pagination.
-- [x] Patient registration/editing interface; duplicate candidate pre-check.
-- [x] Clinic-local chart numbering and audit events.
-- [ ] Java 17 backend build and full regression on PostgreSQL.
-- [ ] Two-clinic CRUD/RLS integration and browser E2E validation.
-- [ ] Production data/privacy approval (not authorized).
+## Current milestone snapshot
+
+M2 patient management is implemented through M2.4 and locally regressed under M2.5. All local checks pass; hosted CI for the final M2.5 source is BLOCKED by unavailable GitHub authentication. M2 remains open. Do not start M3 or use real patient data.
 
 # Dental Clinic SaaS — Project Status
 
 **Last updated:** 2026-10-19  
-**Authoritative baseline:** M0.3 working repository plus M0.4 validation fixes
+**Authoritative baseline:** M1.4.6 accepted source plus M2.1–M2.4 implementation; M2.5 local regression in progress
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M0.5–M0.7 prototypes implemented; M1.1–M1.4 implementation, live invitation replay, live clinic registration, and local regression/database validation delivered; M1 complete for development acceptance; hosted CI passed on the final M1.4.6 acceptance commit; **not production-ready**.
+**Overall status:** M1 complete for development; M2 local regression and functional checks pass, but M2 remains open pending hosted CI evidence; NVD dependency assessment is deferred to M10; **not production-ready**.
 
 ## Progress conventions
 
@@ -32,7 +27,7 @@
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
 | M1 | Clinics, branches, dentists, chairs, staff | **COMPLETE FOR DEVELOPMENT — live E2E and hosted CI passed; production gates remain open** | Complete tenant/branch onboarding, permissions, real-account browser E2E, security and CI gates |
-| M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
+| M2 | Patients, medical history, consent, search | **In progress — local validation passed; hosted CI blocked** | Registration to searchable protected patient chart; all M2 gates plus hosted CI evidence |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
 | M4 | Odontogram | Not started | Adult/primary tooth surfaces, statuses, historical entries |
 | M5 | Visits and clinical documentation | Not started | SOAP notes, signed addenda, files, prescriptions |
@@ -340,46 +335,57 @@ See [M1.4.6 final acceptance report](docs/M1_4_6_FINAL_ACCEPTANCE_REPORT.md), [l
 
 ## M2.2 — Patient medical history, guardians, consent & identity review (2026-10-19)
 
-**Status: IMPLEMENTED / RUNTIME VERIFICATION PENDING.** M1 remains accepted for development. Synthetic test patients only; production use is not authorized.
+**Status: Local backend, PostgreSQL, frontend, and authenticated browser regression passed under M2.5.**
 
-- [x] Forward-only V15 migration adds clinic-scoped guardian contacts, one medical history per patient, explicit `UNSIGNED`/`ACKNOWLEDGED` consent tracking, and RLS.
-- [x] Clinic-scoped medical history read/write endpoints restricted to OWNER, ADMIN, and DENTIST, with audit events.
-- [x] Patient guardian contact add/list/remove endpoints, primary guardian index, and audit events.
-- [x] Unsigned consent request and administrative acknowledgement endpoints; acknowledgement explicitly **does not represent informed consent or signature**.
-- [x] Clinic-scoped exact-name/DOB identity review endpoint, advisory only, with no automatic merge.
-- [x] Patient Registry embeds M2.2 patient-specific tabs/panels; clinical history hidden from Front Desk.
-- [x] Security-oriented controller tests authored.
-- [ ] Java 17 Maven unit/integration tests and PostgreSQL V1–V15 migration/RLS validation not executed here.
-- [ ] Frontend `npm ci`, TypeScript build, lint, Vitest and browser E2E not executed here.
-- [ ] Real signature capture, guardian authority verification, signed consent storage, patient merge/identity reconciliation and full clinical workflows remain out of scope.
+- V15 adds RLS-protected guardian contacts, one medical history per patient, and UNSIGNED/ACKNOWLEDGED consent status.
+- Patient-care reads/writes are clinic-scoped, audit-recorded, and role-restricted; FRONT_DESK receives 403 for clinical history.
+- Guardian contacts are self-reported, and administrative consent acknowledgement is not a signature or permission to treat.
+- V14→V15 upgrade preserved the synthetic history and legacy consent fields. Review legacy consent meaning before production migration.
 
-See `docs/M2_2_DELIVERY_REPORT.md`. NVD scan remains deferred to M10 and remains a production gate.
+See `docs/M2_2_DELIVERY_REPORT.md` and the M2.5 PostgreSQL and security reports. NVD remains deferred to M10 and is a production gate.
 
-## M2.3 — Patient 360° integration and regression preparation (2026-10-19)
+## M2.3 — Patient 360° integration and regression (2026-10-19)
 
-**Status: PARTIALLY IMPLEMENTED / RUNTIME VALIDATION PENDING.** Synthetic patient data only.
+**Status: Live local browser and API regression passed; hosted CI remains blocked at M2.5.**
 
-- [x] Patient 360° now resolves a selected patient through authenticated `/api/patients/{id}` rather than presenting fictional Maria Santos as if it were a real patient record.
-- [x] Patient search and selection from the clinic-scoped registry; deep linking to selected patient from Patient Registry.
-- [x] Patient-specific demographics and the existing M2.2 medical history, guardian, consent and identity-review UI are reachable together.
-- [x] Clinical roles continue to control medical history visibility through M2.2 backend permissions; Front Desk cannot view medical history.
-- [x] Unimplemented odontogram, visits, treatment plans and billing are explicit Coming soon screens, not fake records attributed to patients.
-- [ ] Java 17 compilation, PostgreSQL V1–V15 migration/RLS and clinical authorization integration tests must run on the development machine.
-- [ ] React TypeScript production build, lint, Vitest and authenticated browser E2E must pass before M2.3 can be accepted.
-- [ ] Minor legal-guardian authority, signed informed consent and patient identity merge/reconciliation remain out of scope and must not be treated as verified.
+- Patient 360° resolves clinic-scoped patient identity and keeps unfinished odontogram, visits, treatment plans, and billing as Coming soon screens.
+- Live Chromium exercised selected-patient rendering, delayed rapid patient switching, and foreign-clinic deep-link denial against the actual backend.
+- The mocked UI suite separately passed on Chromium, Firefox, and WebKit at desktop, tablet, and mobile viewports.
+- Patient-specific clinical history remains restricted to OWNER/ADMIN/DENTIST; guardians and consent retain their explicit limitations.
 
-See `docs/M2_3_INTEGRATION_REPORT.md` for delivery scope and validation checklist.
+See `docs/M2_3_INTEGRATION_REPORT.md` and `docs/M2_5_FRONTEND_BROWSER_REGRESSION.md`.
 
 ## M2.4 — Patient identity, guardian and consent security regression (2026-10-19)
 
-**Implementation: delivered; full runtime certification: BLOCKED / PENDING. M2 remains open.**
+**Status: Local security regressions passed under M2.5; overall M2 acceptance remains open pending hosted CI.**
 
-- Updated Patient 360° to clear patient details before authorization of a new UUID and reject displaying records whose ID does not match the active URL selection.
-- Prevented out-of-order patient medical-history responses from overriding the selected patient's current data; guardian forms retain entered information if a write fails.
-- Added clear UI cautions that guardians are unverified contacts and UNSIGNED/ACKNOWLEDGED consent records are not treatment consent.
-- Identity review now excludes archived charts from the current patient lookup. Added controller regression tests for clinical-role denial, archived/foreign patient lookup, identity review filtering and consent re-acknowledgement denial.
-- **Verified here:** source diff validation (`git diff --check`), local ZIP integrity and source review.
-- **Blocked here:** `npm ci --offline` failed because `why-is-node-running@3.2.1` is not cached. Maven/Java 17 and PostgreSQL are unavailable; backend tests, V1–V15 Flyway/RLS checks, frontend compile/Vitest and authenticated Playwright were **not executed**. The installed Java is 21, not 17.
-- **Exit criteria:** Java 17 `mvn clean verify`, clean PostgreSQL migration plus cross-clinic restricted-role RLS, npm `ci/lint/test/build`, live synthetic authenticated Playwright across Owner/Admin/Dentist/Front Desk, minor and guardian scenarios, consent transition validation and foreign UUID denial. Do not use real patient data.
+- Patient 360° renders only the currently selected record; stale async responses and foreign UUIDs are denied in local authenticated regression.
+- Guardian relationships remain unverified; UNSIGNED/ACKNOWLEDGED statuses do not constitute signed informed consent.
+- Stale/concurrent demographic edits now use expected versions and return conflicts rather than overwriting new data.
+- Auth/session/invitation and patient-care DTO string forms redact sensitive values. Spring MVC web body and parameter diagnostics remain at INFO even when ambient DEBUG is set.
 
-See `docs/M2_4_SECURITY_REGRESSION_REPORT.md`.
+See `docs/M2_4_SECURITY_REGRESSION_REPORT.md` and `docs/M2_5_SECURITY_FINDINGS.md`.
+
+
+## M2.5 — Full Runtime Regression & Patient Management Acceptance (2026-10-19)
+
+**Status: IN PROGRESS — local development acceptance checks passed; M2 is not complete because hosted CI evidence is blocked.** Do not start M3 or use real patient data.
+
+- [x] Java 17.0.20 `mvn -B -ntp clean verify`: 53 backend tests passed, 0 failed, 0 skipped; JAR package/repackage passed.
+- [x] PostgreSQL 18.6 fresh V1–V15 migration and restricted-role two-clinic RLS/relationship checks passed.
+- [x] Separate V14→V15 upgrade preserved synthetic patient history and legacy consent metadata.
+- [x] Authenticated HTTP integration: patient create/search/update, clinic-local chart number, duplicate candidates, stale and concurrent edits, care roles, guardian, consent, archive, and audit checks passed.
+- [x] Frontend `npm ci` using the lockfile; `npm run lint` completed with two React state-in-effect warnings, Vitest 26/26, TypeScript/Vite production build passed.
+- [x] Authenticated Chromium Playwright with a local synthetic Google JWKS and isolated backend/PostgreSQL: patient workflow, duplicate review, guardian/history/consent, archive, delayed patient switching, cross-clinic denial, and role denial passed (1/1).
+- [x] Offline/mocked Playwright UI suite passed 12/12 across Chromium, Firefox, WebKit; each browser tested desktop/tablet/mobile layout coverage. This is distinct from live-backend coverage.
+- [x] Auth/session/invitation and patient-care DTO string forms redact sensitive values; Spring MVC body/request-parameter logging is not debug-enabled, even under ambient DEBUG. Final live backend logs contained neither JWTs nor patient/clinical test values.
+- [ ] Hosted GitHub Actions on the final M2.5 application commit: **BLOCKED**. `gh auth status` reports an invalid stored credential; GitHub API access failed. No current hosted run is claimed.
+- [ ] Live Google provider authentication is not part of the synthetic authenticated Playwright run; prior M1 acceptance evidence is documented separately.
+- [ ] Review the V14→V15 legacy consent mapping before production: existing signed metadata is preserved, while the new `consent_status` default is `UNSIGNED` and is not proof of consent.
+- [ ] The accepted Maven NVD dependency scan remains **DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION** to M10. A completed Maven vulnerability assessment is required before production deployment.
+
+**Test totals:** 92 passed (53 backend + 26 frontend unit + 12 mocked browser + 1 live authenticated browser), 0 failed, 0 skipped, 1 blocked release gate (hosted CI). NVD assessment is deferred separately, not passed.
+
+**Security boundary:** M2 development acceptance does not authorize real patient information or production clinical workflows. No automatic patient merges are implemented; duplicate detection remains advisory. Guardian relationships remain unverified; administrative consent acknowledgement is not a signed informed consent.
+
+Reports: `docs/M2_5_FINAL_ACCEPTANCE_REPORT.md`, `docs/M2_5_BACKEND_REGRESSION.md`, `docs/M2_5_POSTGRESQL_TENANT_ISOLATION.md`, `docs/M2_5_FRONTEND_BROWSER_REGRESSION.md`, and `docs/M2_5_SECURITY_FINDINGS.md`. Sanitized evidence is under `docs/evidence/m2_5/`.

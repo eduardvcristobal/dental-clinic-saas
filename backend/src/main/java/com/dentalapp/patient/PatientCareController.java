@@ -36,7 +36,9 @@ public class PatientCareController {
  private void audit(AuthPrincipal p,String action,UUID subject) {
   db.update("INSERT INTO audit_log(clinic_id,user_id,action,entity,entity_id) VALUES (?,?,?,'patient',?)",p.clinicId(),p.userId(),action,subject);
  }
- public record HistoryInput(String allergies,String conditions,String medications) {}
+ public record HistoryInput(String allergies,String conditions,String medications) {
+  @Override public String toString() { return "HistoryInput[clinicalFields=[REDACTED]]"; }
+ }
  @GetMapping("/medical-history") @Transactional(readOnly=true)
  public Map<String,Object> history(Authentication auth,@PathVariable UUID patientId) {
   AuthPrincipal p=staff(auth);clinical(p);patient(p.clinicId(),patientId);
@@ -50,7 +52,9 @@ public class PatientCareController {
   db.update("INSERT INTO patient_medical_history(clinic_id,patient_id,allergies,conditions,medications,updated_by) VALUES (?,?,?,?,?,?) ON CONFLICT (clinic_id,patient_id) DO UPDATE SET allergies=excluded.allergies,conditions=excluded.conditions,medications=excluded.medications,updated_by=excluded.updated_by,updated_at=now(),version=patient_medical_history.version+1",p.clinicId(),patientId,allergies,conditions,medications,p.userId());
   audit(p,"PATIENT_MEDICAL_HISTORY_UPDATED",patientId);return history(auth,patientId);
  }
- public record GuardianInput(String fullName,String relationship,String phone,String email,Boolean primary) {}
+ public record GuardianInput(String fullName,String relationship,String phone,String email,Boolean primary) {
+  @Override public String toString() { return "GuardianInput[contactFields=[REDACTED], primary="+primary+"]"; }
+ }
  @GetMapping("/guardians") @Transactional(readOnly=true)
  public List<Map<String,Object>> guardians(Authentication auth,@PathVariable UUID patientId) {
   AuthPrincipal p=staff(auth);patient(p.clinicId(),patientId);

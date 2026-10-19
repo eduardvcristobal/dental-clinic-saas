@@ -13,7 +13,11 @@
 - Existing M2.1 Patient 360° demonstration remains visibly fictional; real M2.2 fields appear only in the selected patient record.
 - All sample test data must be synthetic.
 
-## Verification
-- Implementation and source packaging performed here. Java 17/Maven, PostgreSQL, and installed frontend dependencies were unavailable; compilation and runtime E2E are **NOT VERIFIED**.
-- Execute on local development environment: `cd backend && mvn clean verify`, fresh V1–V15 migrations and restricted-role RLS; `cd frontend && npm ci && npm run lint && npm run build && npm test`; then browser regression for clinical roles and Front Desk.
-- Maintain the accepted NVD deferral as a pre-production requirement.
+## M2.5 regression evidence (2026-10-19)
+- Java 17.0.20 full Maven suite: 53 passed, 0 failed, 0 skipped, including patient-care authorization, audit, consent transition, and token-redaction regressions.
+- PostgreSQL 18.6 fresh V1–V15 and V14→V15 upgrade tests passed with a restricted application role; medical history, guardians, consent, same-clinic foreign keys, and RLS were exercised.
+- Live authenticated Playwright against Spring Boot and isolated PostgreSQL passed guardian contact entry/removal, clinical history save, administrative consent acknowledgement, and cross-role/cross-clinic denials.
+- A legacy V14 consent row retained its original signed_at/signed_by metadata across V15. The new status defaults to UNSIGNED; the M2 UI does not treat the legacy fields as verified consent. Review legacy consent semantics before production migration.
+- Consent acknowledgement remains an administrative action, not a signature or treatment authorization. Guardian relationships remain unverified.
+
+The accepted Maven NVD scan is DEFERRED — OWNER-ACCEPTED SECURITY EXCEPTION to M10. Complete a Maven vulnerability assessment before any production deployment.

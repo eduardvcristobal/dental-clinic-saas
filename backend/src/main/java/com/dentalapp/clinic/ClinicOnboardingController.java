@@ -41,9 +41,18 @@ public class ClinicOnboardingController {
         this.db=db; this.google=google; this.tx=new TransactionTemplate(transactions);
         this.selfServiceEnabled=selfServiceEnabled; this.allowedOrigins=allowedOrigins;
     }
-    public record CreateClinic(String googleIdToken,String slug,String name,String timezone,String branchName,String ownerName) {}
-    public record Invite(String email,String role,UUID branchId) {}
-    public record Accept(String googleIdToken,String token,String fullName) {}
+    public record CreateClinic(String googleIdToken,String slug,String name,String timezone,String branchName,String ownerName) {
+        @Override public String toString() { return "CreateClinic[request=[REDACTED]]"; }
+    }
+    public record Invite(String email,String role,UUID branchId) {
+        @Override public String toString() { return "Invite[email=[REDACTED], role=" + role + ", branchId=" + branchId + "]"; }
+    }
+    public record Accept(String googleIdToken,String token,String fullName) {
+        @Override public String toString() { return "Accept[identityAndInvitation=[REDACTED], fullName=[REDACTED]]"; }
+    }
+    public record InvitationCreated(UUID id,String token,String expiresAt) {
+        @Override public String toString() { return "InvitationCreated[id=" + id + ", token=[REDACTED], expiresAt=" + expiresAt + "]"; }
+    }
     public record DentistInput(UUID userId,String fullName,String licenseNo,String specialty,String calendarColor) {}
     private static String required(String v,int max) {
         if(v==null || v.isBlank() || v.strip().length()>max) throw bad("Invalid input");
@@ -95,7 +104,7 @@ public class ClinicOnboardingController {
         }
     }
     @PostMapping("/invitations") @ResponseStatus(HttpStatus.CREATED)
-    public Map<String,Object> invite(Authentication auth,@RequestBody Invite input) {
+    public InvitationCreated invite(Authentication auth,@RequestBody Invite input) {
         AuthPrincipal user=manager(auth);
         if(input==null) throw bad("Invitation details are required.");
         String invitedEmail=email(input.email());
@@ -124,7 +133,7 @@ public class ClinicOnboardingController {
                 id,user.clinicId(),invitedEmail,role,input.branchId(),hash(token),user.userId(),java.sql.Timestamp.from(Instant.now().plusSeconds(604800)));
             event(user.clinicId(),user.userId(),"INVITATION_CREATED",id,role);
             // One-time token is shown to the inviting manager only. Never persisted in plaintext.
-            return Map.<String,Object>of("id",id,"token",token,"expiresAt",Instant.now().plusSeconds(604800).toString());
+            return new InvitationCreated(id,token,Instant.now().plusSeconds(604800).toString());
         });
     }
     @GetMapping("/invitations")

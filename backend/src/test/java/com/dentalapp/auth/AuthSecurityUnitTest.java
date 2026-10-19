@@ -23,6 +23,16 @@ class AuthSecurityUnitTest {
     assertNotEquals(sample, AuthService.hash(sample));
     assertNotEquals(AuthService.hash(sample), AuthService.hash(sample+"x"));
   }
+  @Test void sensitiveAuthenticationDtosRedactIdentityAccessAndRefreshTokensInToString() {
+    String idToken="synthetic-google-identity-token";
+    String accessToken="synthetic-access-token";
+    String refreshToken="synthetic-refresh-cookie";
+    assertFalse(new AuthController.GoogleLogin("clinic",idToken).toString().contains(idToken));
+    assertFalse(new AuthController.PlatformAdminGoogleLogin(idToken).toString().contains(idToken));
+    assertTrue(new AuthService.Session(accessToken,java.util.Map.of(),java.util.Map.of()).toString().contains("[REDACTED]"));
+    assertFalse(new AuthService.Session(accessToken,java.util.Map.of(),java.util.Map.of()).toString().contains(accessToken));
+    assertFalse(new AuthService.Issued(new AuthService.Session(accessToken,java.util.Map.of(),java.util.Map.of()),refreshToken).toString().contains(refreshToken));
+  }
   @Test void tenantContextRestoresPreviousValueAndClearsAfterFailure() {
     UUID outer=UUID.randomUUID(), inner=UUID.randomUUID();
     TenantContext.set(outer);

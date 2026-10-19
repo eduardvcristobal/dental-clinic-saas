@@ -6,6 +6,7 @@ import com.dentalapp.service.NumberingService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -32,9 +33,23 @@ class PatientControllerTest {
         verifyNoInteractions(db);
     }
     @Test void createRejectsInvalidDemographicsBeforeWriting() {
-        var invalid=new PatientController.PatientInput(" ","Doe",LocalDate.now(),null,null,null,null,null,null,false);
+        var invalid=new PatientController.PatientInput(" ","Doe",LocalDate.now(),null,null,null,null,null,null,false,null);
         assertThrows(ResponseStatusException.class,()->api.create(auth("FRONT_DESK"),invalid));
         verifyNoInteractions(db,numbers);
+    }
+    @Test void updatesRequireAnExpectedVersionAndRejectStaleWrites() {
+        var user=auth("OWNER");var principal=(AuthPrincipal)user.getPrincipal();var id=UUID.randomUUID();
+        var withoutVersion=new PatientController.PatientInput("Anne","Doe",null,null,null,null,null,null,null,false,null);
+        var missing=assertThrows(ResponseStatusException.class,()->api.update(user,id,withoutVersion));
+        assertEquals(HttpStatus.BAD_REQUEST,missing.getStatusCode());
+
+        var stale=new PatientController.PatientInput("Anne","Doe",null,null,null,null,null,null,null,false,2L);
+        when(db.update(contains("AND version=?"),any(Object[].class))).thenReturn(0);
+        when(db.queryForObject(contains("SELECT count(*) FROM patient"),eq(Integer.class),eq(id),eq(principal.clinicId()))).thenReturn(1);
+        var conflict=assertThrows(ResponseStatusException.class,()->api.update(user,id,stale));
+        assertEquals(HttpStatus.CONFLICT,conflict.getStatusCode());
+        verify(db).update(contains("AND version=?"),any(Object[].class));
+        verify(db,never()).update(startsWith("INSERT INTO audit_log"),any(Object[].class));
     }
     @Test void archiveIsNotAvailableToReceptionOrDentists() {
         for (String role:List.of("FRONT_DESK","DENTIST"))

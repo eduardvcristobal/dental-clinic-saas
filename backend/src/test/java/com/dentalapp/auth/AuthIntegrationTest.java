@@ -114,6 +114,7 @@ class AuthIntegrationTest {
     UUID branchId;
     UUID otherBranchId;
     UUID dentistUserId;
+    UUID frontDeskUserId;
     String otherSlug;
     String slug;
 
@@ -131,6 +132,7 @@ class AuthIntegrationTest {
         branchId = UUID.randomUUID();
         otherBranchId = UUID.randomUUID();
         dentistUserId = UUID.randomUUID();
+        frontDeskUserId = UUID.randomUUID();
         TenantContext.runAs(clinicId, () -> {
             jdbc.update("INSERT INTO branch(id,clinic_id,name) VALUES (?,?,?)", branchId, clinicId, "Synthetic Main Branch A");
             jdbc.update("""
@@ -143,6 +145,8 @@ class AuthIntegrationTest {
             """, UUID.randomUUID(), clinicId, "inactive-" + slug + "@test.invalid", "unused", "Inactive Staff");
             jdbc.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VALUES (?,?,?,?,?,'DENTIST',true)",
                     dentistUserId, clinicId, "dentist-" + slug + "@test.invalid", "unused", "Synthetic Dentist");
+            jdbc.update("INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VALUES (?,?,?,?,?,'FRONT_DESK',true)",
+                    frontDeskUserId, clinicId, "frontdesk-" + slug + "@test.invalid", "unused", "Synthetic Front Desk");
             jdbc.update("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES (?,?,?,?,?)",
                     UUID.randomUUID(), clinicId, "A-" + slug, "Patient", "A");
         });
@@ -156,6 +160,9 @@ class AuthIntegrationTest {
     }
 
     private String email() { return "active-" + slug + "@test.invalid"; }
+    private String accessToken(String mail) throws Exception {
+        return objectMapper.readTree(login(slug, validToken(mail), "http://localhost:5173").body()).get("accessToken").asText();
+    }
     private String token(String issuer, String audience, String email, boolean verified, Instant expires, RSAKey key) throws Exception {
         var claims = new JWTClaimsSet.Builder().issuer(issuer).subject("google-subject-" + UUID.randomUUID())
                 .audience(audience).issueTime(Date.from(Instant.now().minusSeconds(10)))
@@ -318,12 +325,82 @@ class AuthIntegrationTest {
         TenantContext.set(clinicId);
         try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement();
              var result = statement.executeQuery("SELECT count(*) FROM app_user")) {
-            result.next(); assertThat(result.getInt(1)).isEqualTo(3);
+            result.next(); assertThat(result.getInt(1)).isEqualTo(4);
         } finally { TenantContext.clear(); }
         try (Connection connection = dataSource.getConnection(); var statement = connection.createStatement();
              var result = statement.executeQuery("SELECT count(*) FROM app_user")) {
             result.next(); assertThat(result.getInt(1)).isZero();
         }
+    }
+
+    @Test void springMvcBodyAndRequestParameterDiagnosticsAreNotDebugEnabled() {
+        assertThat(org.slf4j.LoggerFactory.getLogger("org.springframework.web.servlet.DispatcherServlet").isDebugEnabled()).isFalse();
+        assertThat(org.slf4j.LoggerFactory.getLogger("org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor").isDebugEnabled()).isFalse();
+        assertThat(org.slf4j.LoggerFactory.getLogger("org.springframework.web.servlet.mvc.method.annotation.HttpEntityMethodProcessor").isDebugEnabled()).isFalse();
+    }
+
+    @Test void patientRegistryIdentityCareAndArchiveWorkOverAuthenticatedHttp() throws Exception {
+        String owner = accessToken(email());
+        String dentist = accessToken("dentist-" + slug + "@test.invalid");
+        String frontDesk = accessToken("frontdesk-" + slug + "@test.invalid");
+        String body = objectMapper.writeValueAsString(java.util.Map.of(
+                "firstName", "Synthetic", "lastName", "Patient", "birthDate", "2015-04-03",
+                "sex", "UNDISCLOSED", "phone", "555-0101", "email", "patient@test.invalid",
+                "smsOptIn", false));
+        var created = request("POST", "/api/patients", body, null, "http://localhost:5173", "Bearer " + owner);
+        assertThat(created.statusCode()).isEqualTo(201);
+        var patient = objectMapper.readTree(created.body());
+        UUID patientId = UUID.fromString(patient.get("id").asText());
+        assertThat(patient.get("chart_no").asText()).isEqualTo("P-000001");
+        assertThat(request("GET", "/api/patients?q=Synthetic%20Patient&limit=10", null, null, null, "Bearer " + owner).statusCode()).isEqualTo(200);
+        var candidates = request("GET", "/api/patients/duplicate-candidates?firstName=Synthetic&lastName=Patient&birthDate=2015-04-03", null, null, null, "Bearer " + owner);
+        assertThat(objectMapper.readTree(candidates.body()).size()).isEqualTo(1);
+
+        var initial = objectMapper.readTree(request("GET", "/api/patients/" + patientId, null, null, null, "Bearer " + owner).body());
+        long version = initial.get("version").asLong();
+        var update = objectMapper.readTree(body);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) update).put("firstName", "Edited").put("version", version);
+        var firstEdit = objectMapper.writeValueAsString(update);
+        var editResult = request("PUT", "/api/patients/" + patientId, firstEdit, null, "http://localhost:5173", "Bearer " + owner);
+        assertThat(editResult.statusCode()).isEqualTo(200);
+        var stale = request("PUT", "/api/patients/" + patientId, firstEdit, null, "http://localhost:5173", "Bearer " + owner);
+        assertThat(stale.statusCode()).isEqualTo(409);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) update).put("version", 1).put("lastName", "Concurrent A");
+        String concurrentA = objectMapper.writeValueAsString(update);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) update).put("lastName", "Concurrent B");
+        String concurrentB = objectMapper.writeValueAsString(update);
+        var editPool = Executors.newFixedThreadPool(2);
+        try {
+            Future<HttpResponse<String>> editA = editPool.submit(() -> request("PUT", "/api/patients/" + patientId, concurrentA, null, "http://localhost:5173", "Bearer " + owner));
+            Future<HttpResponse<String>> editB = editPool.submit(() -> request("PUT", "/api/patients/" + patientId, concurrentB, null, "http://localhost:5173", "Bearer " + owner));
+            var statuses = java.util.List.of(editA.get(20, TimeUnit.SECONDS).statusCode(), editB.get(20, TimeUnit.SECONDS).statusCode());
+            assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        } finally { editPool.shutdownNow(); }
+        assertThat(request("GET", "/api/patients/" + otherPatientId, null, null, null, "Bearer " + owner).statusCode()).isEqualTo(404);
+
+        var historyWrite = request("PUT", "/api/patients/" + patientId + "/medical-history",
+                "{\"allergies\":\"synthetic pollen\",\"conditions\":\"test condition\",\"medications\":\"test medication\"}", null, "http://localhost:5173", "Bearer " + dentist);
+        assertThat(historyWrite.statusCode()).isEqualTo(200);
+        assertThat(request("GET", "/api/patients/" + patientId + "/medical-history", null, null, null, "Bearer " + frontDesk).statusCode()).isEqualTo(403);
+        assertThat(request("GET", "/api/patients/" + otherPatientId + "/guardians", null, null, null, "Bearer " + owner).statusCode()).isEqualTo(404);
+
+        var guardian = request("POST", "/api/patients/" + patientId + "/guardians",
+                "{\"fullName\":\"Synthetic guardian\",\"relationship\":\"Parent\",\"primary\":true}", null, "http://localhost:5173", "Bearer " + owner);
+        assertThat(guardian.statusCode()).isEqualTo(201);
+        UUID guardianId = UUID.fromString(objectMapper.readTree(guardian.body()).get("id").asText());
+        var consent = request("POST", "/api/patients/" + patientId + "/consents", "{\"formType\":\"test form\"}", null, "http://localhost:5173", "Bearer " + owner);
+        assertThat(consent.statusCode()).isEqualTo(201);
+        UUID consentId = UUID.fromString(objectMapper.readTree(consent.body()).get("id").asText());
+        assertThat(request("POST", "/api/patients/" + patientId + "/consents/" + consentId + "/acknowledge", null, null, "http://localhost:5173", "Bearer " + owner).statusCode()).isEqualTo(200);
+        assertThat(request("POST", "/api/patients/" + patientId + "/consents/" + consentId + "/acknowledge", null, null, "http://localhost:5173", "Bearer " + owner).statusCode()).isEqualTo(409);
+        assertThat(TenantContext.callAs(clinicId, () -> jdbc.queryForObject("SELECT signed_at IS NULL AND signed_by IS NULL FROM consent_form WHERE id=? AND clinic_id=?", Boolean.class, consentId, clinicId))).isTrue();
+        assertThat(request("DELETE", "/api/patients/" + patientId + "/guardians/" + guardianId, null, null, "http://localhost:5173", "Bearer " + owner).statusCode()).isEqualTo(204);
+        assertThat(TenantContext.callAs(clinicId, () -> jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE clinic_id=? AND user_id=? AND entity_id=?", Integer.class, clinicId, activeUserId, patientId))).isGreaterThanOrEqualTo(3);
+
+        assertThat(request("POST", "/api/patients/" + patientId + "/archive", null, null, "http://localhost:5173", "Bearer " + dentist).statusCode()).isEqualTo(403);
+        assertThat(request("POST", "/api/patients/" + patientId + "/archive", null, null, "http://localhost:5173", "Bearer " + owner).statusCode()).isEqualTo(204);
+        assertThat(request("GET", "/api/patients/" + patientId, null, null, null, "Bearer " + owner).statusCode()).isEqualTo(404);
+        assertThat(request("GET", "/api/patients/" + patientId + "/guardians", null, null, null, "Bearer " + owner).statusCode()).isEqualTo(404);
     }
 
     @Test void clinicOwnerInvitationAcceptanceBranchDentistAndAuditLifecycleWorkOverHttp() throws Exception {
@@ -428,7 +505,7 @@ class AuthIntegrationTest {
         var unauthorizedOrigin = request("POST", "/api/onboarding/clinics", objectMapper.writeValueAsString(validBody),
                 null, "https://attacker.invalid", null);
         assertThat(unauthorizedOrigin.statusCode()).isEqualTo(403);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM clinic WHERE slug LIKE 'registration-%'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM clinic WHERE slug=?", Integer.class, clinicSlug)).isEqualTo(1);
         TenantContext.runAs(clinicId, () -> {
             assertThat(jdbc.queryForObject("SELECT count(*) FROM branch WHERE clinic_id=?", Integer.class, clinicId)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE clinic_id=? AND role='OWNER'", Integer.class, clinicId)).isEqualTo(1);

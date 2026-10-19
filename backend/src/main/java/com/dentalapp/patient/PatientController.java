@@ -24,7 +24,9 @@ public class PatientController {
 
     public record PatientInput(String firstName, String lastName, LocalDate birthDate, String sex,
                                String phone, String email, String address, String emergencyName,
-                               String emergencyPhone, Boolean smsOptIn) {}
+                               String emergencyPhone, Boolean smsOptIn, Long version) {
+        @Override public String toString() { return "PatientInput[demographics=[REDACTED], contact=[REDACTED], emergency=[REDACTED], version=" + version + "]"; }
+    }
 
     private AuthPrincipal staff(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthPrincipal p))
@@ -85,9 +87,15 @@ public class PatientController {
     @PutMapping("/{id}") @Transactional
     public Map<String,Object> update(Authentication auth,@PathVariable UUID id,@RequestBody PatientInput input) {
         AuthPrincipal user=staff(auth);validate(input);
-        int count=db.update("UPDATE patient SET first_name=?,last_name=?,birth_date=?,sex=?,phone=?,email=?,address=?,emergency_name=?,emergency_phone=?,sms_opt_in=?,updated_at=now(),version=version+1 WHERE id=? AND clinic_id=? AND deleted_at IS NULL",
-            required(input.firstName(),"first name",120),required(input.lastName(),"last name",120),input.birthDate(),optional(input.sex(),20),optional(input.phone(),80),optional(input.email(),254),optional(input.address(),2000),optional(input.emergencyName(),160),optional(input.emergencyPhone(),80),Boolean.TRUE.equals(input.smsOptIn()),id,user.clinicId());
-        if(count!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Patient not found");
+        if(input.version()==null || input.version()<0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"A current patient version is required");
+        int count=db.update("UPDATE patient SET first_name=?,last_name=?,birth_date=?,sex=?,phone=?,email=?,address=?,emergency_name=?,emergency_phone=?,sms_opt_in=?,updated_at=now(),version=version+1 WHERE id=? AND clinic_id=? AND deleted_at IS NULL AND version=?",
+            required(input.firstName(),"first name",120),required(input.lastName(),"last name",120),input.birthDate(),optional(input.sex(),20),optional(input.phone(),80),optional(input.email(),254),optional(input.address(),2000),optional(input.emergencyName(),160),optional(input.emergencyPhone(),80),Boolean.TRUE.equals(input.smsOptIn()),id,user.clinicId(),input.version());
+        if(count!=1) {
+            Integer active=db.queryForObject("SELECT count(*) FROM patient WHERE id=? AND clinic_id=? AND deleted_at IS NULL",Integer.class,id,user.clinicId());
+            if(active==null || active==0) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Patient not found");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Patient record changed. Reload before saving.");
+        }
         audit(user.clinicId(),user.userId(),"PATIENT_UPDATED",id);
         return get(auth,id);
     }

@@ -35,8 +35,12 @@ public class AuthService {
     }
     public record Staff(UUID id, UUID clinicId, String email, String fullName, String role,
                         String clinicSlug, String clinicName) {}
-    public record Session(String accessToken, Map<String, Object> user, Map<String, Object> clinic) {}
-    public record Issued(Session session, String cookie) {}
+    public record Session(String accessToken, Map<String, Object> user, Map<String, Object> clinic) {
+        @Override public String toString() { return "Session[accessToken=[REDACTED], user=[REDACTED], clinic=[REDACTED]]"; }
+    }
+    public record Issued(Session session, String cookie) {
+        @Override public String toString() { return "Issued[session=[REDACTED], cookie=[REDACTED]]"; }
+    }
 
     public UUID clinicForSlug(String slug) {
         if (slug == null || !slug.matches("[a-z0-9][a-z0-9-]{0,62}")) throw unauthorized();

@@ -1,0 +1,8 @@
+M2.5 PostgreSQL evidence (sanitized)
+Engine: PostgreSQL 18.6
+Fresh schema: Flyway V1-V15 all applied successfully.
+Restricted role: dental_app checked NOSUPERUSER and NOBYPASSRLS.
+Tenant test: synthetic clinic A/B patient, history, guardian, consent, invitations and branch relationships. Cross-tenant reads filtered, writes denied, invalid same-clinic references rejected.
+Upgrade: fresh database migrated to V14, synthetic history and consent seeded, V15 applied. Patient/history and legacy consent metadata preserved; V15 guardian table/tenant policy available.
+Test totals: migration/RLS 1 passed; V14-V15 upgrade 1 passed; included in Maven 51/51 total.
+Existing local dental database and ports 5432/55432 were not used.

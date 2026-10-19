@@ -1,0 +1,6 @@
+M2.5 frontend evidence (sanitized)
+Runtime: Node v24.18.0; npm 11.16.0
+Install: npm ci --no-audit --no-fund (lockfile install succeeded)
+Lint: npm run lint — exit 0; two react(set-state-in-effect) warnings in async data-loading effects.
+Unit: npm test -- --reporter=dot — 6 files, 26 tests passed, 0 failed.
+Build: npm run build — TypeScript build and Vite production bundle succeeded; 51 modules.

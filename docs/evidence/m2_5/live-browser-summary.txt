@@ -1,0 +1,6 @@
+M2.5 authenticated live browser evidence (sanitized)
+Command: bash scripts/m2_5_live_e2e.sh with a unique M25_DATABASE_NAME and non-secret local test environment.
+Result: 1 Chromium Playwright test passed against local Spring Boot and a newly created isolated PostgreSQL database.
+Authentication: ephemeral local RSA/JWKS test identity for synthetic @m25.test accounts; no real Google credentials. Live trace, screenshot, and video were disabled.
+Covered: register minor synthetic chart, clinic-local chart number, duplicate candidate pause, guardian add, unsigned consent request and administrative acknowledgement, clinical history save, Patient 360 open, delayed rapid switch, foreign-clinic deep link, Front Desk history 403, API foreign ID 404, demographic edit and archive.
+Final backend log was checked for JWT-shaped strings and none were present after DTO redaction and debug logging was disabled.

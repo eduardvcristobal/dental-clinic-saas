@@ -18,6 +18,13 @@ spring:
       hibernate:
         jdbc.time_zone: UTC
 
+# Spring MVC DEBUG logs can include request/response bodies, which may contain identity
+# tokens, patient demographics, guardians, or clinical history. Keep web body diagnostics
+# out of normal logs even if an ambient DEBUG flag enables other framework diagnostics.
+logging:
+  level:
+    org.springframework.web: INFO
+
 app:
   auth:
     google-client-id: ${GOOGLE_CLIENT_ID:}

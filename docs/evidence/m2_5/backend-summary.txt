@@ -1,0 +1,8 @@
+M2.5 backend evidence (sanitized)
+Date: 2026-10-19
+Runtime: OpenJDK 17.0.20; Maven; PostgreSQL 18.6
+Command: cd backend && mvn -B -ntp clean verify
+Result: BUILD SUCCESS
+Tests run: 53, Failures: 0, Errors: 0, Skipped: 0
+Includes authenticated HTTP integration, V1-V15 fresh migration/RLS, V14-V15 upgrade preservation, Spring MVC logger-level assertions, and sensitive DTO-redaction regressions. Maven verification was also run with an ambient DEBUG flag enabled.
+Full console output is not distributed; temporary debug logs are excluded to avoid carrying test identity data.

@@ -22,8 +22,12 @@ public class AuthController {
     AuthController(AuthService service, GoogleIdentityVerifier google, AuthProperties props) {
         this.service=service;this.google=google;this.props=props;
     }
-    record GoogleLogin(@NotBlank String clinicSlug, @NotBlank String idToken) {}
-    record PlatformAdminGoogleLogin(@NotBlank String idToken) {}
+    record GoogleLogin(@NotBlank String clinicSlug, @NotBlank String idToken) {
+        @Override public String toString() { return "GoogleLogin[clinicSlug=" + clinicSlug + ", idToken=[REDACTED]]"; }
+    }
+    record PlatformAdminGoogleLogin(@NotBlank String idToken) {
+        @Override public String toString() { return "PlatformAdminGoogleLogin[idToken=[REDACTED]]"; }
+    }
     @PostMapping("/google")
     ResponseEntity<AuthService.Session> google(@Valid @RequestBody GoogleLogin request, HttpServletRequest http) {
         checkOrigin(http);
