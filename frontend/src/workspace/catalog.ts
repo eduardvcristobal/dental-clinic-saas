@@ -6,6 +6,7 @@ const CLINICAL: WorkspaceRole[] = ['OWNER', 'ADMIN', 'DENTIST']
 const ADMIN: WorkspaceRole[] = ['OWNER', 'ADMIN']
 export const WORKSPACE_MODULES: WorkspaceModule[] = [
   { id: 'command-center', title: 'Command Center', group: 'Workspace', description: 'A role-specific view of the working day', state: 'preview', roles: ALL },
+  { id: 'journey', title: 'Patient Journey', group: 'Workspace', description: 'End-to-end workflow design simulation', state: 'preview', roles: ALL },
   { id: 'calendar', title: 'Calendar', group: 'Workspace', description: 'Dentist and chair scheduling', state: 'preview', roles: ALL },
   { id: 'patients', title: 'Patients', group: 'Workspace', description: 'Patient directory and search', state: 'preview', roles: ALL },
   { id: 'check-in', title: 'Check-in', group: 'Workspace', description: 'Arrivals and waiting room', state: 'coming-soon', roles: ALL },

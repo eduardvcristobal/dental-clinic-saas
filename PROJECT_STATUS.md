@@ -4,7 +4,7 @@
 **Authoritative baseline:** M0.3 working repository plus M0.4 validation fixes
 **Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M0.5 UI implementation added; M0.4 security/CI/provider checks remain; **not pilot-ready**.
+**Overall status:** M0.6 patient journey simulation implemented; M0.5 visual verification and M0.4 security/CI/provider checks remain; **not pilot-ready**.
 
 ## Progress conventions
 
@@ -20,6 +20,7 @@
 |---|---|---|---|
 | M0 | Foundation audit & setup | **In progress — M0.4 local validation passed; CI/provider checks open** | Java 17, local PG migration/RLS/auth tests, frontend checks passed; hosted CI and browser/provider verification pending |
 | M0.5 | Role-specific application shell & connected UI previews | Implemented — review/verification pending | Responsive navigation, safe demo state, role-based previews, tests |
+| M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M1 | Clinics, branches, dentists, chairs, staff | Not started | Complete tenant/branch onboarding, permissions and CRUD with tests |
 | M2 | Patients, medical history, consent, search | Not started | Registration to searchable protected patient chart |
 | M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
@@ -117,3 +118,18 @@ Complete a live Google sign-in smoke check at `/platform-admin/login` (after con
 - [ ] Live clinic data, authenticated global search, real branch selection, notices, and modules remain future milestones.
 
 **Security boundary:** Front-end role gating is not authorization. Real APIs must enforce backend permission checks and PostgreSQL tenant isolation. Platform Admin's privileged RLS test/audit findings remain open for production readiness.
+
+## M0.6 — Patient workflow simulation (2026-10-19)
+
+**Status: Implemented; build/test execution blocked by missing npm dependency cache; user design review pending.**
+
+- [x] Added guided `/workspace/journey` preview with seven steps: registration → booking → arrival → examination → treatment planning → billing → recall.
+- [x] Included checklist prompts, previous/next navigation, role-aware links and responsive layout.
+- [x] All checklist state is temporary React memory; no business API calls, persistence, invoice posting or clinical signing.
+- [x] Added static unit tests for journey order, module restrictions and step boundaries.
+- [x] Documented exception pathways and acceptance prompts in `docs/M0_6_WORKFLOW_REVIEW.md`.
+- [ ] Frontend `npm ci --offline` blocked on missing `why-is-node-running@3.2.1`; Vitest/build/lint not run for this milestone.
+- [ ] Human desktop/tablet design review with dentist and receptionist, plus actual browser checks.
+- [ ] M0.4 Platform Admin and RLS/provider/CI security blockers remain open.
+
+**Change policy:** M0.6 does not activate M1–M8 modules. The demo does not grant clinical or financial access.
