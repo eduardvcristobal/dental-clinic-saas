@@ -19,6 +19,7 @@ public class BillingController {
  public record DraftInput(UUID patientId,UUID branchId,UUID planId,String notes){}
  public record LineInput(UUID procedureId,UUID planItemId,String description,Integer quantity,BigDecimal unitPrice,BigDecimal discount){}
  public record IssueInput(Long expectedVersion){}
+ public record PaymentInput(BigDecimal amount,String method,String reference,UUID idempotencyKey){}
  private AuthPrincipal cashier(Authentication a){
   if(a==null||!(a.getPrincipal() instanceof AuthPrincipal p)||!Set.of("OWNER","ADMIN","FRONT_DESK").contains(p.role()))
    throw new AccessDeniedException("Billing permission required");
@@ -107,4 +108,44 @@ public class BillingController {
   event(p,id,"ISSUED",null,null);
   return detail(a,id);
  }
+ @GetMapping("/invoices/{id}/balance") @Transactional(readOnly=true)
+ public Map<String,Object> balance(Authentication a,@PathVariable UUID id){
+  AuthPrincipal p=cashier(a);var bill=invoice(p.clinicId(),id,false);
+  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+   BigDecimal.class,p.clinicId(),id);
+  BigDecimal total=(BigDecimal)bill.get("total");
+  return Map.of("invoiceId",id,"currency",bill.get("currency_code"),"total",total,"paid",paid,"balance",total.subtract(paid));
+ }
+ @PostMapping("/invoices/{id}/payments") @ResponseStatus(HttpStatus.CREATED) @Transactional
+ public Map<String,Object> payment(Authentication a,@PathVariable UUID id,@RequestBody PaymentInput in){
+  AuthPrincipal p=cashier(a);UUID c=p.clinicId();var bill=invoice(c,id,true);
+  require(in!=null&&validMoney(in.amount())&&in.amount().signum()>0&&in.method()!=null&&
+   Set.of("CASH","CARD","BANK_TRANSFER","EWALLET","HMO","OTHER").contains(in.method())&&in.idempotencyKey()!=null,
+   "Positive amount, valid payment method and idempotency key required");
+  require(in.reference()==null||in.reference().length()<=255,"Reference too long");
+  if(!Set.of("ISSUED","PARTIALLY_PAID").contains(bill.get("status")))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice is not collectible");
+  var previous=db.queryForList("SELECT id,amount,method,reference FROM payment WHERE clinic_id=? AND invoice_id=? AND idempotency_key=?",
+   c,id,in.idempotencyKey());
+  if(!previous.isEmpty()){
+   var old=previous.get(0);
+   if(((BigDecimal)old.get("amount")).compareTo(in.amount())!=0 || !Objects.equals(old.get("method"),in.method()) ||
+       !Objects.equals(old.get("reference"),in.reference()))
+    throw new ResponseStatusException(HttpStatus.CONFLICT,"Idempotency key reused with different payment");
+   return balance(a,id);
+  }
+  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+   BigDecimal.class,c,id);
+  BigDecimal total=(BigDecimal)bill.get("total");
+  if(paid.add(in.amount()).compareTo(total)>0)
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Payment exceeds outstanding balance");
+  UUID paymentId=UUID.randomUUID();
+  db.update("INSERT INTO payment(id,clinic_id,invoice_id,patient_id,amount,method,reference,received_by,idempotency_key) "+
+   "VALUES(?,?,?,?,?,?,?,?,?)",paymentId,c,id,bill.get("patient_id"),in.amount(),in.method(),in.reference(),p.userId(),in.idempotencyKey());
+  db.update("UPDATE invoice SET status=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND id=?",
+   paid.add(in.amount()).compareTo(total)==0?"PAID":"PARTIALLY_PAID",c,id);
+  event(p,id,"PAYMENT_RECORDED",paymentId,null);
+  return balance(a,id);
+ }
+
 }
