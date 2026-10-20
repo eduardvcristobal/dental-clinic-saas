@@ -61,6 +61,24 @@ class MigrationAndTenantIsolationTest {
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
                 """, Integer.class)).isGreaterThanOrEqualTo(30);
+        // M8.10.22: verify notification callbacks and actions remain under FORCE RLS.
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_class
+            WHERE relname IN ('notification_delivery','notification_consent',
+                              'notification_delivery_event','notification_patient_action')
+              AND relrowsecurity AND relforcerowsecurity
+            """, Integer.class)).isEqualTo(4);
+        // Both appointment change and patient consent withdrawal must invalidate claimed work.
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_trigger
+            WHERE NOT tgisinternal AND tgname IN
+              ('notification_consent_withdrawal_sync')
+            """, Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_proc
+            WHERE proname IN ('suppress_stale_appointment_reminders',
+                             'suppress_withdrawn_notification_consent')
+            """, Integer.class)).isEqualTo(2);
         // M3 tables must carry forced tenant RLS and restricted-role grants.
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
