@@ -87,7 +87,7 @@ public final class NotificationDeliveryWorker {
    var result=provider.deliver(new NotificationTransport.Delivery(clinic,claim.patient(),channel,claim.destination(),
       claim.appointment()==null?"Please contact your clinic regarding your upcoming recall.":"Please contact your clinic regarding your upcoming appointment.",claim.key()));
    tx.executeWithoutResult(s->db.update("""
-    UPDATE notification_delivery SET status='CLAIMED',provider_reference=?,provider_name=?,
+    UPDATE notification_delivery SET status='ACCEPTED',provider_reference=?,provider_name=?,
       provider_status='ACCEPTED',sent_at=?,lease_until=NULL,next_attempt_at=NULL
     WHERE clinic_id=? AND id=? AND status='CLAIMED'
    """,result.providerReference(),channel==NotificationTransport.Channel.EMAIL?"resend":"twilio",
