@@ -1,6 +1,7 @@
 import { SchedulingWorkspace } from './SchedulingWorkspace'
 import { Odontogram } from './ClinicalOdontogram'
 import { PatientEncounters } from './PatientEncounters'
+import { PatientTreatmentPlans } from './PatientTreatmentPlans'
 import { PatientRegistry, PatientCare, type Patient } from './PatientRegistry'
 import { api } from '../api/client'
 import { ClinicManagement } from './ClinicManagement'
@@ -70,7 +71,8 @@ function Patient360({ role }: { role: WorkspaceRole }) {
       {tab==='care'&&<PatientCare key={patient.id} patient={patient} role={role}/>}
       {tab==='visits'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<PatientEncounters key={patient.id} patientId={patient.id}/>:<p role="alert">Clinical encounter access is restricted.</p>)}
       {tab==='chart'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<Odontogram key={patient.id} patientId={patient.id}/>:<p role="alert">Clinical chart access is restricted.</p>)}
-      {['plans','billing'].includes(tab)&&<ComingSoon title={{chart:'Odontogram',visits:'Visits and clinical notes',plans:'Treatment plans',billing:'Patient billing'}[tab]??'Clinical workflow'} description="This feature is not yet connected to this patient's clinical record. No sample findings, SOAP notes, invoices or payments are shown as though they belong to the patient."/>}
+      {tab==='plans'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<PatientTreatmentPlans key={patient.id} patientId={patient.id} role={role}/>:<p role="alert">Treatment planning access is restricted.</p>)}
+      {tab==='billing'&&<ComingSoon title={{chart:'Odontogram',visits:'Visits and clinical notes',plans:'Treatment plans',billing:'Patient billing'}[tab]??'Clinical workflow'} description="This feature is not yet connected to this patient's clinical record. No sample findings, SOAP notes, invoices or payments are shown as though they belong to the patient."/>}
     </>})()}</>}
   </>
 }
