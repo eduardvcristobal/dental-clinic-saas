@@ -12,7 +12,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Signed callbacks are correlated only inside explicitly configured tenant RLS contexts. */
 @Component
-public final class NotificationWebhookReconciler {
+public class NotificationWebhookReconciler {
  private final JdbcTemplate db;
  private final TransactionTemplate tx;
  private final List<UUID> clinics;
