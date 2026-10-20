@@ -2,6 +2,7 @@ package com.dentalapp.clinic;
 
 import com.dentalapp.auth.AuthPrincipal;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,6 +21,7 @@ public class BillingController {
  public record LineInput(UUID procedureId,UUID planItemId,String description,Integer quantity,BigDecimal unitPrice,BigDecimal discount){}
  public record IssueInput(Long expectedVersion){}
  public record PaymentInput(BigDecimal amount,String method,String reference,UUID idempotencyKey){}
+ public record InstallmentInput(LocalDate dueDate,BigDecimal amount){}
  private AuthPrincipal cashier(Authentication a){
   if(a==null||!(a.getPrincipal() instanceof AuthPrincipal p)||!Set.of("OWNER","ADMIN","FRONT_DESK").contains(p.role()))
    throw new AccessDeniedException("Billing permission required");
@@ -146,6 +148,32 @@ public class BillingController {
    paid.add(in.amount()).compareTo(total)==0?"PAID":"PARTIALLY_PAID",c,id);
   event(p,id,"PAYMENT_RECORDED",paymentId,null);
   return balance(a,id);
+ }
+
+ @GetMapping("/invoices/{id}/installments") @Transactional(readOnly=true)
+ public List<Map<String,Object>> installments(Authentication a,@PathVariable UUID id){
+  AuthPrincipal p=cashier(a);invoice(p.clinicId(),id,false);
+  return db.queryForList("SELECT id,due_date,amount,paid FROM payment_schedule WHERE clinic_id=? AND invoice_id=? ORDER BY due_date,id",p.clinicId(),id);
+ }
+ @PostMapping("/invoices/{id}/installments") @ResponseStatus(HttpStatus.CREATED) @Transactional
+ public List<Map<String,Object>> addInstallment(Authentication a,@PathVariable UUID id,@RequestBody InstallmentInput in){
+  AuthPrincipal p=cashier(a);UUID c=p.clinicId();var bill=invoice(c,id,true);
+  require(in!=null&&in.dueDate()!=null&&validMoney(in.amount())&&in.amount().signum()>0,
+   "Valid due date and positive amount required");
+  if(!Set.of("ISSUED","PARTIALLY_PAID").contains(bill.get("status")))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice cannot be scheduled");
+  BigDecimal scheduled=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment_schedule WHERE clinic_id=? AND invoice_id=?",
+   BigDecimal.class,c,id);
+  BigDecimal outstanding=(BigDecimal)bill.get("total");
+  outstanding=outstanding.subtract(db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+   BigDecimal.class,c,id));
+  if(scheduled.add(in.amount()).compareTo(outstanding)>0)
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Installments exceed outstanding balance");
+  UUID installment=UUID.randomUUID();
+  db.update("INSERT INTO payment_schedule(id,clinic_id,invoice_id,due_date,amount) VALUES(?,?,?,?,?)",
+   installment,c,id,in.dueDate(),in.amount());
+  event(p,id,"INSTALLMENT_ADDED",installment,null);
+  return installments(a,id);
  }
 
 }
