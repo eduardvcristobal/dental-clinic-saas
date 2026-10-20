@@ -45,13 +45,16 @@ public class NotificationWebhookReconciler {
      case "BOUNCED","FAILED","COMPLAINED","UNSUBSCRIBED" -> "SUPPRESSED";
      default -> "ACCEPTED";
     };
+    // Older callbacks are retained in the audit table but must not regress current state.
+    // Terminal outcomes cannot be reversed by a delayed ACCEPTED/SENT callback.
     db.update("""
-      UPDATE notification_delivery SET status=CASE
-        WHEN status IN ('DELIVERED','SUPPRESSED') THEN status
-        ELSE ? END,
+      UPDATE notification_delivery SET
+        status=CASE WHEN status IN ('DELIVERED','SUPPRESSED') THEN status ELSE ? END,
         provider_status=?, provider_event_at=?
       WHERE clinic_id=? AND id=?
-      """,next,eventType,Timestamp.from(occurredAt),clinic,id);
+        AND (provider_event_at IS NULL OR provider_event_at<=?)
+        AND status NOT IN ('DELIVERED','SUPPRESSED')
+      """,next,eventType,Timestamp.from(occurredAt),clinic,id,Timestamp.from(occurredAt));
     if(Set.of("COMPLAINED","UNSUBSCRIBED").contains(eventType)){
       db.update("""
        UPDATE notification_consent SET consented=false,updated_at=now()
