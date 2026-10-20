@@ -6,7 +6,7 @@ type Diagnosis={id:string;code_system:string;diagnosis_code:string;description:s
 type Signature={signed:boolean;note?:SOAP & {signed_at:string;signed_by:string}}
 type Amendment={id:string;reason:string;amendment:string;created_at:string}
 type Prescription={id:string;medication:string;dosage:string;instructions:string;status:string}
-type Chart={events:Array<{id:string;tooth_number:number;condition_code:string;event_kind:string}>}
+type Chart={events:Array<{id:string;tooth_number:number;condition_code:string;event_kind:string;encounter_visit_id?:string|null}>}
 type Revision=SOAP & {id:string;draft_version:number;recorded_at:string}
 const blank:SOAP={subjective:'',objective:'',assessment:'',plan_notes:'',version:0}
 export function PatientEncounters({patientId}:{patientId:string}) {
@@ -22,6 +22,8 @@ export function PatientEncounters({patientId}:{patientId:string}) {
  const [amendments,setAmendments]=useState<Amendment[]>([])
  const [prescriptions,setPrescriptions]=useState<Prescription[]>([])
  const [chart,setChart]=useState<Chart|null>(null)
+ const [toothNumber,setToothNumber]=useState(11)
+ const [findingCode,setFindingCode]=useState('CARIES')
  const [amendReason,setAmendReason]=useState('')
  const [amendText,setAmendText]=useState('')
  const [medication,setMedication]=useState('')
@@ -74,6 +76,20 @@ export function PatientEncounters({patientId}:{patientId:string}) {
    setDiagnoses(await api<Diagnosis[]>(url));setDiagnosisCode('');setDescription('')
    setNotice('Diagnosis recorded in encounter history.')
   }catch(e){setError(e instanceof Error?e.message:'Could not record diagnosis')}
+  finally{setBusy(false)}
+ }
+ async function addEncounterFinding(){
+  if(!editable)return
+  setBusy(true);setError('');setNotice('')
+  try{
+   const base=`/api/odontogram/patients/${encodeURIComponent(patientId)}`
+   await api(base+'/events',{method:'POST',body:JSON.stringify({
+    toothNumber,conditionCode:findingCode,clinicalStatus:'EXISTING',eventKind:'OBSERVATION',
+    encounterVisitId:selected
+   })})
+   setChart(await api<Chart>(base))
+   setNotice('Tooth finding recorded for this encounter.')
+  }catch(e){setError(e instanceof Error?e.message:'Could not link finding to this encounter')}
   finally{setBusy(false)}
  }
  async function signNote(){
@@ -139,8 +155,17 @@ export function PatientEncounters({patientId}:{patientId:string}) {
      </>}
    </section>
    <section aria-label="Patient odontogram context"><h4>Patient odontogram context</h4>
-     <p>Patient-wide tooth findings are shown for reference. They are not automatically attributed to this encounter.</p>
-     {chart?<p>{chart.events.length} longitudinal tooth finding events recorded.</p>:<p>Chart context unavailable.</p>}
+     <p>Patient-wide chart history is separate from findings explicitly attributed to this encounter.</p>
+     {chart?<><p>{chart.events.length} patient-wide events; {chart.events.filter(e=>e.encounter_visit_id===selected).length} linked to this encounter.</p>
+       <ul>{chart.events.filter(e=>e.encounter_visit_id===selected).map(e=><li key={e.id}>Tooth {e.tooth_number} — {e.condition_code} ({e.event_kind})</li>)}</ul>
+     </>:<p>Chart context unavailable.</p>}
+     {editable&&<div>
+       <label>FDI tooth number <input type="number" min={11} max={85} value={toothNumber} onChange={e=>setToothNumber(Number(e.target.value))}/></label>
+       <label>Condition <select value={findingCode} onChange={e=>setFindingCode(e.target.value)}>
+         {['CARIES','RESTORATION','MISSING','UNERUPTED','FRACTURE','CROWN','IMPLANT','OTHER'].map(c=><option key={c}>{c}</option>)}
+       </select></label>
+       <button type="button" disabled={busy||!chart} onClick={()=>void addEncounterFinding()}>Record finding for encounter</button>
+     </div>}
    </section>
    <h4>Clinical diagnoses</h4>
    {!diagnoses.length&&<p>No diagnoses recorded.</p>}
