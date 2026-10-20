@@ -95,9 +95,9 @@ public final class NotificationDeliveryWorker {
     Timestamp.from(result.acceptedAt()),clinic,id));
   }catch(RuntimeException e){
    tx.executeWithoutResult(s->db.update("""
-    UPDATE notification_delivery SET status=CASE WHEN attempts>=10 THEN 'SUPPRESSED' ELSE 'FAILED' END,
-      next_attempt_at=CASE WHEN attempts>=10 THEN NULL ELSE now() + (interval '1 second' * LEAST(3600,30*power(2,LEAST(attempts-1,7)))) END,
-      lease_until=NULL,failure_reason='Provider request unsuccessful'
+    UPDATE notification_delivery SET status='SUPPRESSED',
+      next_attempt_at=NULL,
+      lease_until=NULL,failure_reason='Provider outcome uncertain; reconcile manually before any retry'
     WHERE clinic_id=? AND id=? AND status='CLAIMED'
    """,clinic,id));
   }
