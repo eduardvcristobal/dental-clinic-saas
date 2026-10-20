@@ -120,9 +120,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Scan commits introduced relative to main, across all merge parents,
+      # plus the entire current working tree. Avoid rescanning already-fixed
+      # historical test fixtures inherited from accepted main/M5 branches.
+      - name: Scan new commits and complete working tree with Gitleaks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch --no-tags origin main
+          base="$(git merge-base HEAD origin/main)"
+          echo "Gitleaks new-commit range: ${base}..HEAD"
+          docker run --rm -v "$PWD:/repo:ro" -w /repo ghcr.io/gitleaks/gitleaks:v8.24.3 \
+            detect --source /repo --log-opts="${base}..HEAD" --redact --exit-code 2
+          docker run --rm -v "$PWD:/repo:ro" -w /repo ghcr.io/gitleaks/gitleaks:v8.24.3 \
+            detect --source /repo --no-git --redact --exit-code 2
       - uses: actions/dependency-review-action@v4
         if: github.event_name == 'pull_request' && vars.RUN_DEPENDENCY_REVIEW == 'true'
 
