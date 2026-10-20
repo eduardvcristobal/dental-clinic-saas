@@ -1,15 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { teethFor, surfaceOptions } from './odontogram'
 
 type Event = {id:string;tooth_number:number;surface:string|null;condition_code:string;event_kind:string;clinical_status:string;notes:string|null;recorded_at:string;supersedes_event_id:string|null}
 type Chart = {patientId:string;chartId:string|null;events:Event[]}
-const permanent = [1,2,3,4].flatMap(q=>Array.from({length:8},(_,i)=>q*10+i+1))
-const primary = [5,6,7,8].flatMap(q=>Array.from({length:5},(_,i)=>q*10+i+1))
-export function teethFor(dentition:'permanent'|'primary'|'mixed') {return dentition==='permanent'?permanent:dentition==='primary'?primary:[...permanent,...primary]}
-export function surfaceOptions(tooth:number) {
- const q=Math.floor(tooth/10),p=tooth%10
- return ['WHOLE','M','D','B','L','F',...(q===1||q===2||q===5||q===6?['P']:[]),p<=3?'I':'O']
-}
 const conditions=['CARIES','RESTORATION','MISSING','UNERUPTED','FRACTURE','CROWN','IMPLANT','OTHER']
 export function Odontogram({patientId}:{patientId:string}) {
  const [dentition,setDentition]=useState<'permanent'|'primary'|'mixed'>('permanent')
