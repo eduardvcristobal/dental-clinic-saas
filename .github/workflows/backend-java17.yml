@@ -29,7 +29,9 @@ jobs:
       - name: Create disposable clean migration database
         env:
           PGPASSWORD: ci-owner-password
-        run: createdb -h localhost -U postgres dental_m04_migration
+        run: |
+          createdb -h localhost -U postgres dental_m04_migration
+          createdb -h localhost -U postgres dental_m4_upgrade
       - name: Run backend unit and PostgreSQL integration tests on JDK 17
         working-directory: backend
         env:
@@ -49,6 +51,9 @@ jobs:
           M04_MIGRATION_TEST_OWNER_USER: postgres
           M04_MIGRATION_TEST_OWNER_PASSWORD: ci-owner-password
           M04_MIGRATION_TEST_APP_PASSWORD: ci-app-password
+          M4_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m4_upgrade
+          M4_UPGRADE_TEST_DB_USER: postgres
+          M4_UPGRADE_TEST_DB_PASSWORD: ci-owner-password
         run: mvn -B -ntp verify
 
   frontend:
