@@ -11,7 +11,7 @@ Branch: `feature/m8-10-provider-delivery-hardening` (base `main`, 2026-10-20).
 - A feature-gated worker now calls the provider adapter for explicitly configured tenant UUIDs; both worker and outbound flags remain disabled by default. **Do not enable either feature flag until all remaining safety gates have passed.**
 - Worker has transactional SKIP LOCKED claiming, lease timeout, bounded backoff and final revalidation, but multi-worker lease fencing, renewal, delivery-attempt audit, and safe Twilio idempotent replay still need verification and hardening.
 - No cryptographically verified Resend/Twilio delivery callback endpoint, deduplication workflow, delivery-state transitions or webhook replay guard.
-- Random patient token generation and constant-time hash comparison utilities exist, but no token issuing/consuming controller, single-use transaction, opt-out endpoint, or staff-approval booking workflow exists.
+- Feature-gated patient action endpoints issue and redeem expiring single-use tokens; opt-out suppresses pending/failed work and non-opt-out actions record a clinic-scoped staff work item. No staff-approval booking workflow exists, tokens are not embedded in outgoing messages, and end-to-end token replay/expiration/RLS security tests remain incomplete.
 - V37 suppresses pending/failed reminders on appointment changes; dispatch revalidates consent, policy and active booking, and postpones messages during clinic-zone quiet hours. **CLAIMED/in-flight invalidation and concurrent appointment edits still need a race-safe send fence.**
 - No rate limiting, per-destination and tenant quotas, credential rotation playbook, provider sandbox integration tests, or production verification.
 - Real provider callbacks and consent handling require privacy/compliance signoff. Keep payloads PHI-minimal; never include diagnosis, treatment or other sensitive details in external messages.
@@ -22,6 +22,7 @@ app:
   notifications:
     outbound-enabled: false
     worker-enabled: false
+    patient-actions-enabled: false
     worker-clinic-ids: ${NOTIFICATION_WORKER_CLINIC_IDS:}
     resend-api-key: ${RESEND_API_KEY:}
     from-email: ${NOTIFICATION_FROM_EMAIL:}
