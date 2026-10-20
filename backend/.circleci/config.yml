@@ -1,0 +1,21 @@
+
+version: 2.1
+
+jobs:
+  verify-connection:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          name: Verify GitHub connection
+          command: |
+            echo "CircleCI is connected!"
+            echo "Branch: $CIRCLE_BRANCH"
+            echo "Commit: $CIRCLE_SHA1"
+            git status --short
+
+workflows:
+  build-and-test:
+    jobs:
+      - verify-connection
