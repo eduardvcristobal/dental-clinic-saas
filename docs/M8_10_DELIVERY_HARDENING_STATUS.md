@@ -45,3 +45,6 @@ Tests have been added but **not run locally**: direct repository access is throu
 
 ## M8.10.20 lease safety gate
 Expired `CLAIMED` rows are intentionally **not** automatically retried: a crash after an accepted SMS request cannot be distinguished from a failed request without provider lookup. Operations must reconcile these stranded claims against provider records before explicit recovery. This is a fail-closed interim policy, not finished concurrency safety. Worker and outbound switches must remain OFF pending appointment-change send fencing, provider-side retry safety, and real PostgreSQL concurrency tests.
+
+## M8.10.20 additional unknown-outcome protection
+Provider exceptions (including timeouts and malformed acknowledgments) now quarantine the attempted delivery as SUPPRESSED with a generic reconciliation reason and no automatic retry. A callback may still reconcile a provider-accepted event. This is deliberate availability loss to avoid duplicate patient messages; implement provider-specific confirmed-nonacceptance classification and a protected manual replay workflow before enabling outbound traffic. **Sending can still race an appointment/consent edit after preflight; do not enable production delivery.**
