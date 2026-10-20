@@ -404,3 +404,9 @@ Reports: `docs/M2_5_FINAL_ACCEPTANCE_REPORT.md`, `docs/M2_5_BACKEND_REGRESSION.m
 - Full local regression on the remediated tree: backend 53/53 (0 skipped; `M04_*`/`M25_*` disposable-DB tests enabled), V1–V15 fresh migration + RLS + tenant isolation, auth integration, patient management, V14→V15 upgrade test; frontend 26/26, lint clean, build; Playwright Chromium 4/4; total 83 passed / 0 failed.
 - Hosted CI (verified via GitHub CLI API, not assumed): run **39348777480** on `main` commit **a5894c2fe765d3d9b18df3f1c3d3d9894aba364e** — java17, frontend, browser, security all **success**; `owasp` job skipped (opt-in, not configured). HTTPS push was initially rejected for missing `workflow` OAuth scope; resolved by pushing over SSH; gh token remained valid so no re-login was needed.
 - Final decision: **PASS — M2 complete for development acceptance**. Residual risk register + acceptance checklist: `docs/M2_5_1_DEPENDENCY_SECURITY_TRIAGE.md`, `docs/M2_5_1_REMEDIATION_REGRESSION.md`, `docs/M2_5_1_HOSTED_CI_EVIDENCE.md`, `docs/M2_5_1_M2_ACCEPTANCE_CHECKLIST.md`.
+
+## M3.1–M3.9 — Scheduling implementation (2026-10-20)
+
+**Status: IMPLEMENTED IN SOURCE, NOT YET RUNTIME CERTIFIED.** Nine milestone commits completed in sequence. Scheduling includes appointment policies, dentist availability, chair blocks, booking, calendar, lifecycle events, arrival queue, waitlist and notification outbox (without external delivery). Additional correction commits harden resource locking and fix V17 RLS migration quoting. See `docs/M3_1_TO_M3_9_DELIVERY_REPORT.md` for commits and validation limitations.
+
+**M3.10 remains required** for Java 17, Flyway V1–V21/PostgreSQL restricted-role RLS, frontend tests, authenticated browser regression, concurrency, and hosted CI. Synthetic data only. Residual M2.5.1 dependency security findings remain tracked for M10.
