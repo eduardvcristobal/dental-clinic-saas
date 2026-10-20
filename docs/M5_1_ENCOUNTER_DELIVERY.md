@@ -32,3 +32,12 @@ Status: Implemented in source — acceptance requires successful hosted CI.
 - Java 17/PG16 runtime: NOT YET VERIFIED in this report.
 - Browser and security acceptance: NOT YET VERIFIED.
 - Merge approval: NOT REQUESTED, do not auto-merge.
+
+## Hosted CI verification (2026-10-20)
+
+- Application-code SHA: `9b31558d181268f956a83fc72fc90d7e6b2ad8d7`.
+- [GitHub Actions run 39377682277](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39377682277): Java17/PG16 backend PASS (85 total, 73 executed, 12 skipped), frontend PASS, standard browser PASS, M4 real-backend synthetic clinical browser PASS, Gitleaks PASS.
+- Previous run failed because stale `target/classes` contained a duplicate V25 migration; clean Maven builds corrected this without editing the other agent's historical migrations.
+- OWASP/NVD deferred; private-repository dependency review unavailable. The 12 environment-gated historical tests are not counted as passed.
+- No dedicated authenticated real-backend M5 encounter lifecycle test has yet run; M5.1 end-to-end acceptance remains open. The clinical endpoint implementation is **complete for source development**, not certified for production.
+- No merge authorization granted. PR #2 targets the M4 feature branch, not `main`.
