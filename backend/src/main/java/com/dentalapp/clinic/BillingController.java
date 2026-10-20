@@ -263,4 +263,21 @@ public class BillingController {
   return detail(a,id);
  }
 
+ @GetMapping("/dashboard") @Transactional(readOnly=true)
+ public Map<String,Object> dashboard(Authentication a){
+  AuthPrincipal p=cashier(a);UUID c=p.clinicId();
+  BigDecimal invoiced=db.queryForObject("SELECT coalesce(sum(total),0) FROM invoice WHERE clinic_id=? AND status<>'VOID' AND issued_at IS NOT NULL",
+   BigDecimal.class,c);
+  BigDecimal received=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND voided_at IS NULL",
+   BigDecimal.class,c);
+  BigDecimal outstanding=invoiced.subtract(received);
+  BigDecimal today=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND voided_at IS NULL AND paid_at>=date_trunc('day',now())",
+   BigDecimal.class,c);
+  String currency=db.queryForObject("SELECT currency FROM clinic WHERE id=?",String.class,c);
+  var methods=db.queryForList("SELECT method,sum(amount) AS amount FROM payment WHERE clinic_id=? AND voided_at IS NULL GROUP BY method ORDER BY method",
+   c);
+  return Map.of("currency",currency,"invoiced",invoiced,"received",received,"outstanding",outstanding,
+   "collectionsToday",today,"paymentMethods",methods);
+ }
+
 }
