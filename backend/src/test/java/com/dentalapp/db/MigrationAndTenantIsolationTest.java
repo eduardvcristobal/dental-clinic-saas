@@ -56,7 +56,7 @@ class MigrationAndTenantIsolationTest {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
         assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-                "16", "17", "18", "19", "20", "21");
+                "16", "17", "18", "19", "20", "21", "22", "23");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
@@ -76,6 +76,20 @@ class MigrationAndTenantIsolationTest {
                   AND privilege_type='INSERT'
                 """, Integer.class)).isEqualTo(7);
 
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
+                  AND c.relname IN ('odontogram_chart','odontogram_finding_event')
+                """, Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM pg_policies
+                WHERE schemaname=current_schema()
+                  AND tablename IN ('odontogram_chart','odontogram_finding_event') AND policyname='tenant_isolation'
+                """, Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM pg_indexes
+                WHERE schemaname=current_schema() AND indexname='uq_odontogram_single_supersession'
+                """, Integer.class)).isEqualTo(1);
         // A platform-wide session must not bypass tenant RLS for clinical records.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND policyname='platform_admin_access'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='staff_invitation' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
