@@ -29,6 +29,7 @@ The local database engine was PostgreSQL 18.6. Flyway emitted a warning that thi
 - The live test checks tenant isolation over the date that contains the created appointment. A foreign branch calendar returns an empty list; foreign appointment read and status update return 404.
 - The live workflow creates the `CONFIRMED` and `CANCELLED` events that it asserts in the outbox, and uses the owner UI to create a chair block before testing rejection of a booking on that chair.
 - The live runner creates a uniquely named database, refuses to overwrite an existing one, and exits if a required local port is occupied or a service dies during startup.
+- The live runner generates an ephemeral JWT signing secret for each test run.
 - GitHub Actions now provisions separate M2.5 and M3.10 upgrade and scheduling databases so those tests are included in hosted Java 17 verification.
 
 ## Remaining gate

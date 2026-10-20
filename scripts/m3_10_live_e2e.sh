@@ -39,7 +39,7 @@ JWKS_PID=$!
 export DB_URL="jdbc:postgresql://127.0.0.1:${PGPORT}/${DB_NAME}"
 export DB_OWNER_USER=postgres DB_OWNER_PASSWORD="${M3_10_OWNER_PASSWORD:-}" DB_APP_USER=dental_app DB_APP_PASSWORD="$APP_PASSWORD"
 export GOOGLE_CLIENT_ID="$CLIENT_ID" GOOGLE_JWK_SET_URI="http://127.0.0.1:${JWKS_PORT}/keys"
-export APP_JWT_SECRET='m310-live-e2e-jwt-secret-at-least-32-bytes'
+export APP_JWT_SECRET="$(openssl rand -hex 32)"
 export APP_COOKIE_SECURE=false APP_ALLOWED_ORIGINS="http://127.0.0.1:${FRONTEND_PORT}" APP_ONBOARDING_SELF_SERVICE=true
 export LOGGING_LEVEL_ROOT=WARN
 export SERVER_PORT="$BACKEND_PORT"
