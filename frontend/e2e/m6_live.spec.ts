@@ -80,5 +80,5 @@ test('M6 plan builder, estimates, consent, completion evidence and isolation on 
  await page.context().addCookies([{name:'dental_refresh',value:d.cookie,domain:'127.0.0.1',path:'/api/auth',httpOnly:true,secure:false,sameSite:'Strict'}])
  await page.goto('/workspace/patient-360?patient='+patient)
  await page.getByRole('tab',{name:/Treatment plans/i}).click()
- await expect(page.getByText('Synthetic restorative treatment plan')).toBeVisible()
+ await expect(page.getByRole('heading',{name:/Synthetic restorative treatment plan/})).toBeVisible()
 })
