@@ -439,3 +439,18 @@ The M4 feature branch passed hosted CI on application-code commit `a8ca311`, [Gi
 **Runtime results** for application commit `1c6b13c`: [GitHub Actions run 39378743729](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39378743729): Java 17/PG16 passed (92 tests, 80 executed, 12 skipped), frontend passed (42 Vitest), standard Playwright passed, prior real-backend M4 E2E passed, Gitleaks passed. M5-specific real HTTP/browser authoring E2E remains OPEN; M3 gated tests skipped, OWASP/NVD deferred.
 
 **Next milestones:** M5.3 signing/locking/amendments, M5.4 prescriptions/files, M5.5 odontogram/encounter UX integration, M5.6 comprehensive acceptance. Owner authorization needed before any PR merge; no production patient data. See `docs/M5_2_SOAP_DELIVERY.md`.
+
+
+## M5.3–M5.6 — Clinical workflow development validation, October 20, 2026
+
+**Branch:** `feature/m5-clinical-encounters` (stacked on M4; `main` unchanged).
+**Status:** DEVELOPMENT IMPLEMENTATION TESTED; MERGE APPROVAL / PRODUCTION CERTIFICATION PENDING.
+
+- [x] M5.3: immutable signed SOAP snapshot, authenticated sign-off, note locking and append-only amendments (V27).
+- [~] M5.4: prescription **draft** API + secure-identifier document metadata foundation (V28); real upload, secure storage and prescription transmission are NOT implemented.
+- [x] M5.5: same-patient visit attribution for tooth-finding events and encounter UI (V29), no invented historic associations.
+- [x] M5.6: Java 17/PostgreSQL 16, frontend, browser, clinical E2E and Gitleaks run on application SHA `ee83add`.
+
+[GitHub Actions 39383121391](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39383121391): Java 101 total (89 executed, 12 gated skips) zero failures; frontend 42 unit tests; 6 standard Chromium + 2 real Spring Boot/PostgreSQL browser tests; security Gitleaks passed. OWASP/NVD deferred and private-repo Dependency Review unavailable. Firefox/WebKit, production Google, external file storage and electronic prescribing remain unverified. Signed-note attestation is NOT a qualified cryptographic signature.
+
+**Merge gate:** M3 acceptance → M4 PR review/merge → reconcile M5 → rerun CI → explicit owner approval. Not production-certified. See `docs/M5_6_CLINICAL_ACCEPTANCE.md`.
