@@ -42,3 +42,6 @@ Tests have been added but **not run locally**: direct repository access is throu
 - [ ] Tokenized response and opt-out, clinic approval for appointment changes
 - [ ] Reschedule/cancel reminder synchronization and time-zone DST acceptance
 - [ ] Full CI and provider sandbox tests, compliance and production readiness signoff
+
+## M8.10.20 lease safety gate
+Expired `CLAIMED` rows are intentionally **not** automatically retried: a crash after an accepted SMS request cannot be distinguished from a failed request without provider lookup. Operations must reconcile these stranded claims against provider records before explicit recovery. This is a fail-closed interim policy, not finished concurrency safety. Worker and outbound switches must remain OFF pending appointment-change send fencing, provider-side retry safety, and real PostgreSQL concurrency tests.
