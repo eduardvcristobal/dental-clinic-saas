@@ -52,8 +52,8 @@ class SchedulingSecurityTest {
         UUID clinic=UUID.randomUUID(),branch=UUID.randomUUID();
         var principal=new UsernamePasswordAuthenticationToken(new AuthPrincipal(UUID.randomUUID(),clinic,"FRONT_DESK"),null);
         Instant from=Instant.parse("2026-11-01T00:00:00Z"),to=from.plusSeconds(3600);
-        when(db.queryForList(anyString(),eq(clinic),eq(branch),eq(to),eq(from))).thenReturn(List.of(Map.of("id",UUID.randomUUID())));
+        when(db.queryForList(anyString(),eq(clinic),eq(branch),eq(java.sql.Timestamp.from(to)),eq(java.sql.Timestamp.from(from)))).thenReturn(List.of(Map.of("id",UUID.randomUUID())));
         assertEquals(1,api.calendar(principal,branch,from,to).size());
-        verify(db).queryForList(contains("a.clinic_id=? AND a.branch_id=?"),eq(clinic),eq(branch),eq(to),eq(from));
+        verify(db).queryForList(contains("a.clinic_id=? AND a.branch_id=?"),eq(clinic),eq(branch),eq(java.sql.Timestamp.from(to)),eq(java.sql.Timestamp.from(from)));
     }
 }
