@@ -35,6 +35,11 @@ public class TreatmentPlanController {
   db.update("INSERT INTO treatment_plan_event(clinic_id,plan_id,patient_id,actor_id,event_type,details) VALUES(?,?,?,?,?,?)",
    a.clinicId(),plan,patient,a.userId(),kind,details);
  }
+ @GetMapping("/dentists") @Transactional(readOnly=true)
+ public List<Map<String,Object>> dentists(Authentication a){
+  UUID c=clinician(a).clinicId();
+  return db.queryForList("SELECT id,full_name FROM dentist WHERE clinic_id=? AND active=true ORDER BY full_name",c);
+ }
  @GetMapping("/catalog") @Transactional(readOnly=true)
  public List<Map<String,Object>> catalog(Authentication a){
   UUID c=clinician(a).clinicId();
