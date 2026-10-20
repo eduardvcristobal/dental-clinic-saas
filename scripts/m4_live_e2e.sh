@@ -60,7 +60,8 @@ INSERT INTO branch(id,clinic_id,name) VALUES
 INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VALUES
  ('44000000-0000-4000-8000-000000000021','44000000-0000-4000-8000-000000000001','dentist@m25.test','test-only','Synthetic Dentist','DENTIST',true),
  ('44000000-0000-4000-8000-000000000022','44000000-0000-4000-8000-000000000001','frontdesk@m25.test','test-only','Synthetic Front Desk','FRONT_DESK',true),
- ('44000000-0000-4000-8000-000000000023','44000000-0000-4000-8000-000000000002','other-owner@m25.test','test-only','Synthetic Other Owner','OWNER',true);
+ ('44000000-0000-4000-8000-000000000023','44000000-0000-4000-8000-000000000002','other-owner@m25.test','test-only','Synthetic Other Owner','OWNER',true),
+ ('44000000-0000-4000-8000-000000000024','44000000-0000-4000-8000-000000000001','owner@m25.test','test-only','Synthetic Clinic Owner','OWNER',true);
 INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES
  ('44000000-0000-4000-8000-000000000031','44000000-0000-4000-8000-000000000001','M4-A1','Synthetic','Chart Patient'),
  ('44000000-0000-4000-8000-000000000032','44000000-0000-4000-8000-000000000002','M4-B1','Other','Clinic Patient');
