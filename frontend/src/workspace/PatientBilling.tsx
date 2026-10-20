@@ -23,7 +23,7 @@ export function PatientBilling({patientId}:{patientId:string}){
  async function reload(){const rows=await api<Invoice[]>(`/api/billing/patients/${patientId}`);setInvoices(rows);setSelected(old=>rows.some(x=>x.id===old)?old:rows[0]?.id??'')}
  useEffect(()=>{let live=true;setInvoices([]);setSelected('');setDetail(null);setError('')
   void Promise.all([api<Invoice[]>(`/api/billing/patients/${patientId}`),
-   api<Branch[]>('/api/clinic-management/branches'),api<Plan[]>(`/api/treatment-plans/patients/${patientId}`)])
+   api<Branch[]>('/api/clinic-management/branches'),api<Plan[]>(`/api/billing/patients/${patientId}/plans`)])
    .then(([rows,b,p])=>{if(live){setInvoices(rows);setSelected(rows[0]?.id??'');setBranches(b);setBranchId(b[0]?.id??'');setPlans(p)}})
    .catch(e=>{if(live)setError(String(e))});return()=>{live=false}
  },[patientId])
@@ -40,8 +40,8 @@ export function PatientBilling({patientId}:{patientId:string}){
  useEffect(()=>{let active=true;setPlanItems([]);setInstallments([])
   if(!detail)return
   void api<Installment[]>(`/api/billing/invoices/${detail.id}/installments`).then(v=>{if(active)setInstallments(v)}).catch(e=>{if(active)setError(String(e))})
-  if(detail.plan_id)void api<{items:PlanItem[]}>(`/api/treatment-plans/${detail.plan_id}`)
-   .then(x=>{if(active)setPlanItems(x.items)}).catch(e=>{if(active)setError(String(e))})
+  if(detail.plan_id)void api<PlanItem[]>(`/api/billing/invoices/${detail.id}/plan-charges`)
+   .then(x=>{if(active)setPlanItems(x)}).catch(e=>{if(active)setError(String(e))})
   return()=>{active=false}
  },[detail?.id,detail?.plan_id])
  const currency=detail?.currency_code??'PHP'
