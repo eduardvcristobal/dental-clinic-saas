@@ -1,5 +1,6 @@
 import { SchedulingWorkspace } from './SchedulingWorkspace'
 import { Odontogram } from './Odontogram'
+import { PatientEncounters } from './PatientEncounters'
 import { PatientRegistry, PatientCare, type Patient } from './PatientRegistry'
 import { api } from '../api/client'
 import { ClinicManagement } from './ClinicManagement'
@@ -67,8 +68,9 @@ function Patient360({ role }: { role: WorkspaceRole }) {
       <div className="ws-tabs" role="tablist" aria-label="Patient sections">{[['overview','Overview'],['care','History, guardians & consent'],['chart','Odontogram'],['visits','Visits & SOAP'],['plans','Treatment plans'],['billing','Billing']].map(([id,label])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'selected':''} onClick={()=>setTab(id)}>{label}</button>)}</div>
       {tab==='overview'&&<div className="ws-panel ws-management"><h3>Patient details</h3><div className="ws-info-grid"><div><small>Name</small><strong>{patient.first_name} {patient.last_name}</strong></div><div><small>Chart number</small><strong>{patient.chart_no}</strong></div><div><small>Birth date</small><strong>{patient.birth_date??'Not recorded'}</strong></div><div><small>Contact</small><strong>{patient.phone??'Not recorded'}</strong></div><div><small>Email</small><strong>{patient.email??'Not recorded'}</strong></div></div><p>Medical history and consent records are available under History, guardians & consent, subject to your access level.</p><NavLink to="/workspace/patients">Edit demographics in Patient Registry →</NavLink></div>}
       {tab==='care'&&<PatientCare key={patient.id} patient={patient} role={role}/>}
+      {tab==='visits'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<PatientEncounters key={patient.id} patientId={patient.id}/>:<p role="alert">Clinical encounter access is restricted.</p>)}
       {tab==='chart'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<Odontogram key={patient.id} patientId={patient.id}/>:<p role="alert">Clinical chart access is restricted.</p>)}
-      {['visits','plans','billing'].includes(tab)&&<ComingSoon title={{chart:'Odontogram',visits:'Visits and clinical notes',plans:'Treatment plans',billing:'Patient billing'}[tab]??'Clinical workflow'} description="This feature is not yet connected to this patient's clinical record. No sample findings, SOAP notes, invoices or payments are shown as though they belong to the patient."/>}
+      {['plans','billing'].includes(tab)&&<ComingSoon title={{chart:'Odontogram',visits:'Visits and clinical notes',plans:'Treatment plans',billing:'Patient billing'}[tab]??'Clinical workflow'} description="This feature is not yet connected to this patient's clinical record. No sample findings, SOAP notes, invoices or payments are shown as though they belong to the patient."/>}
     </>})()}</>}
   </>
 }
