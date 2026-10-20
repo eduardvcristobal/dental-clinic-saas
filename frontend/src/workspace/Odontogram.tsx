@@ -5,14 +5,14 @@ type Event = {id:string;tooth_number:number;surface:string|null;condition_code:s
 type Chart = {patientId:string;chartId:string|null;events:Event[]}
 const permanent = [1,2,3,4].flatMap(q=>Array.from({length:8},(_,i)=>q*10+i+1))
 const primary = [5,6,7,8].flatMap(q=>Array.from({length:5},(_,i)=>q*10+i+1))
-export function teethFor(dentition:'permanent'|'primary') {return dentition==='permanent'?permanent:primary}
+export function teethFor(dentition:'permanent'|'primary'|'mixed') {return dentition==='permanent'?permanent:dentition==='primary'?primary:[...permanent,...primary]}
 export function surfaceOptions(tooth:number) {
  const q=Math.floor(tooth/10),p=tooth%10
  return ['WHOLE','M','D','B','L','F',...(q===1||q===2||q===5||q===6?['P']:[]),p<=3?'I':'O']
 }
 const conditions=['CARIES','RESTORATION','MISSING','UNERUPTED','FRACTURE','CROWN','IMPLANT','OTHER']
 export function Odontogram({patientId}:{patientId:string}) {
- const [dentition,setDentition]=useState<'permanent'|'primary'>('permanent')
+ const [dentition,setDentition]=useState<'permanent'|'primary'|'mixed'>('permanent')
  const [chart,setChart]=useState<Chart|null>(null)
  const [tooth,setTooth]=useState(11)
  const [surface,setSurface]=useState('WHOLE')
@@ -48,7 +48,7 @@ export function Odontogram({patientId}:{patientId:string}) {
  return <section className="ws-panel ws-management" aria-label="Clinical odontogram">
    <h3>Odontogram — clinical record</h3>
    <p>FDI tooth notation · observations are retained as immutable events. Correct past entries by adding a new event.</p>
-   <label>Dentition <select value={dentition} onChange={e=>{const d=e.target.value as 'permanent'|'primary';setDentition(d);setTooth(d==='permanent'?11:51);setSurface('WHOLE');setSupersedes(null)}}><option value="permanent">Permanent teeth</option><option value="primary">Primary teeth</option></select></label>
+   <label>Dentition <select value={dentition} onChange={e=>{const d=e.target.value as 'permanent'|'primary'|'mixed';setDentition(d);setTooth(d==='permanent'?11:51);setSurface('WHOLE');setSupersedes(null)}}><option value="permanent">Permanent teeth</option><option value="primary">Primary teeth</option><option value="mixed">Mixed dentition</option></select></label>
    <div role="group" aria-label="Select tooth" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(44px,1fr))',gap:7,margin:'18px 0'}}>
      {teethFor(dentition).map(n=><button key={n} type="button" onClick={()=>{setTooth(n);setSurface('WHOLE');setSupersedes(null)}} aria-pressed={tooth===n} style={{border:tooth===n?'2px solid #267d68':'1px solid #a8b2bd',borderRadius:8,padding:'12px 4px',fontWeight:tooth===n?700:400,background:tooth===n?'#d6efe4':'transparent',color:'inherit'}}>{n}{active.some(x=>x.tooth_number===n)?' •':''}</button>)}
    </div>
