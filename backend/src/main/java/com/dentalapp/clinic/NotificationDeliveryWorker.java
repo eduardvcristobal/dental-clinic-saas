@@ -35,10 +35,9 @@ public final class NotificationDeliveryWorker {
   UUID id=tx.execute(s->{
    List<UUID> ids=db.queryForList("""
     SELECT id FROM notification_delivery
-    WHERE clinic_id=? AND (
-      (status IN ('PENDING','FAILED') AND scheduled_for<=now() AND (next_attempt_at IS NULL OR next_attempt_at<=now()))
-      OR (status='CLAIMED' AND lease_until<now())
-    ) AND attempts<10 ORDER BY scheduled_for,id FOR UPDATE SKIP LOCKED LIMIT 1
+    WHERE clinic_id=? AND status IN ('PENDING','FAILED')
+      AND scheduled_for<=now() AND (next_attempt_at IS NULL OR next_attempt_at<=now())
+      AND attempts<10 ORDER BY scheduled_for,id FOR UPDATE SKIP LOCKED LIMIT 1
     """,UUID.class,clinic);
    if(ids.isEmpty())return null;
    UUID next=ids.get(0);
