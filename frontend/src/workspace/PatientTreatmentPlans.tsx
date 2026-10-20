@@ -5,9 +5,10 @@ type Item={id:string;procedure_name:string;tooth_number:number|null;phase:number
 type Procedure={id:string;name:string;code:string;default_price:number;requires_tooth:boolean;requires_surface:boolean}
 type Dentist={id:string;full_name:string}
 type Encounter={id:string;encounter_status:string;started_at:string}
-const money=(value:number)=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(value)
+const money=(value:number,currency:string)=>new Intl.NumberFormat('en',{style:'currency',currency}).format(value)
 export function PatientTreatmentPlans({patientId}:{patientId:string}){
  const [plans,setPlans]=useState<Plan[]>([])
+ const [currency,setCurrency]=useState('PHP')
  const [selected,setSelected]=useState('')
  const [detail,setDetail]=useState<Plan|null>(null)
  const [catalog,setCatalog]=useState<Procedure[]>([])
@@ -34,8 +35,8 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
  useEffect(()=>{let alive=true;setDetail(null);setEvents([])
   if(!selected)return
   void Promise.all([api<Plan>(`/api/treatment-plans/${selected}`),
-   api<Array<{id:string;event_type:string;event_at:string}>>(`/api/treatment-plans/${selected}/history`)])
-   .then(([d,h])=>{if(alive){setDetail(d);setEvents(h)}}).catch(e=>{if(alive)setError(String(e))})
+   api<Array<{id:string;event_type:string;event_at:string}>>(`/api/treatment-plans/${selected}/history`),
+   api<{currency:string}>(`/api/treatment-plans/${selected}/billing-preview`)]).then(([d,h,preview])=>{if(alive){setDetail(d);setEvents(h);setCurrency(preview.currency)}}).catch(e=>{if(alive)setError(String(e))})
   return()=>{alive=false}
  },[selected])
  const refresh=async()=>{await load();if(selected){setDetail(await api<Plan>(`/api/treatment-plans/${selected}`));setEvents(await api(`/api/treatment-plans/${selected}/history`))}}
@@ -61,11 +62,11 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
   </select></label>
   {detail&&<>
    <h4>{detail.title} — {detail.status}</h4>
-   <p><strong>Estimated total: {money(Number(detail.estimate_total??0))}</strong></p>
+   <p><strong>Estimated total: {money(Number(detail.estimate_total??0),currency)}</strong></p>
    <p>This is a proposed estimate, not a charge or invoice.</p>
    <table><thead><tr><th>Procedure</th><th>Tooth</th><th>Qty</th><th>Net estimate</th><th>Progress</th></tr></thead>
    <tbody>{(detail.items??[]).map(i=><tr key={i.id}><td>{i.procedure_name}</td><td>{i.tooth_number??'—'}</td>
-    <td>{i.quantity}</td><td>{money(Number(i.unit_price)*i.quantity-Number(i.discount))}</td><td>
+    <td>{i.quantity}</td><td>{money(Number(i.unit_price)*i.quantity-Number(i.discount),currency)}</td><td>
      {i.status}
      {detail.status==='IN_PROGRESS'&&i.status==='PLANNED'&&
       <button type="button" disabled={busy} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items/${i.id}/progress`,{
