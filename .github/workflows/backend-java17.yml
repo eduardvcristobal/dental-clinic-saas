@@ -111,7 +111,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/dependency-review-action@v4
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && vars.RUN_DEPENDENCY_REVIEW == 'true'
 
   # Long: downloads the NVD catalog. Runs only when an NVD_API_KEY repository secret is configured,
   # because anonymously throttled NVD downloads routinely exceed the job time limit.
