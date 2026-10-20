@@ -26,12 +26,13 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - name: Create disposable clean migration database
+      - name: Create disposable integration and upgrade databases
         env:
           PGPASSWORD: ci-owner-password
         run: |
-          createdb -h localhost -U postgres dental_m04_migration
-          createdb -h localhost -U postgres dental_m4_upgrade
+          for database in dental_m04_migration dental_m25_upgrade dental_m310_upgrade dental_m310_scheduling dental_m4_upgrade; do
+            createdb -h localhost -U postgres "$database"
+          done
       - name: Run backend unit and PostgreSQL integration tests on JDK 17
         working-directory: backend
         env:
@@ -54,6 +55,13 @@ jobs:
           M4_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m4_upgrade
           M4_UPGRADE_TEST_DB_USER: postgres
           M4_UPGRADE_TEST_DB_PASSWORD: ci-owner-password
+          M25_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m25_upgrade
+          M25_UPGRADE_TEST_DB_PASSWORD: ci-owner-password
+          M310_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m310_upgrade
+          M310_UPGRADE_TEST_DB_PASSWORD: ci-owner-password
+          M310_SCHEDULING_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m310_scheduling
+          M310_SCHEDULING_TEST_OWNER_PASSWORD: ci-owner-password
+          M310_SCHEDULING_TEST_APP_PASSWORD: ci-app-password
         run: mvn -B -ntp verify
 
   frontend:
