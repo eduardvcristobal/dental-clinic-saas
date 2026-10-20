@@ -4,6 +4,7 @@ type Plan={id:string;title:string;status:string;version:number;estimate_total?:n
 type Item={id:string;procedure_name:string;tooth_number:number|null;phase:number;quantity:number;unit_price:number;discount:number;status:string}
 type Procedure={id:string;name:string;code:string;default_price:number;requires_tooth:boolean;requires_surface:boolean}
 type Dentist={id:string;full_name:string}
+type Encounter={id:string;encounter_status:string;started_at:string}
 const money=(value:number)=>new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(value)
 export function PatientTreatmentPlans({patientId}:{patientId:string}){
  const [plans,setPlans]=useState<Plan[]>([])
@@ -11,6 +12,8 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
  const [detail,setDetail]=useState<Plan|null>(null)
  const [catalog,setCatalog]=useState<Procedure[]>([])
  const [dentists,setDentists]=useState<Dentist[]>([])
+ const [encounters,setEncounters]=useState<Encounter[]>([])
+ const [visitId,setVisitId]=useState('')
  const [title,setTitle]=useState('');const [dentistId,setDentistId]=useState('')
  const [procedure,setProcedure]=useState('');const [tooth,setTooth]=useState('')
  const [qty,setQty]=useState(1);const [price,setPrice]=useState(0);const [discount,setDiscount]=useState(0)
@@ -23,8 +26,9 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
  useEffect(()=>{let alive=true;setPlans([]);setSelected('');setDetail(null);setError('')
   void Promise.all([api<Plan[]>(`/api/treatment-plans/patients/${encodeURIComponent(patientId)}`),
    api<Procedure[]>('/api/treatment-plans/catalog'),
-   api<{dentists:Dentist[]}>('/api/scheduling/resources')]).then(([p,c,r])=>{
-    if(alive){setPlans(p);setSelected(p[0]?.id??'');setCatalog(c);setDentists(Array.isArray(r?.dentists)?r.dentists:[])}
+   api<{dentists:Dentist[]}>('/api/scheduling/resources'),
+   api<Encounter[]>(`/api/encounters/patients/${encodeURIComponent(patientId)}`)]).then(([p,c,r,e])=>{
+    if(alive){setPlans(p);setSelected(p[0]?.id??'');setCatalog(c);setDentists(Array.isArray(r?.dentists)?r.dentists:[]);setEncounters(e)}
    }).catch(e=>{if(alive)setError(String(e))});return()=>{alive=false}
  },[patientId])
  useEffect(()=>{let alive=true;setDetail(null);setEvents([])
@@ -61,7 +65,21 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
    <p>This is a proposed estimate, not a charge or invoice.</p>
    <table><thead><tr><th>Procedure</th><th>Tooth</th><th>Qty</th><th>Net estimate</th><th>Progress</th></tr></thead>
    <tbody>{(detail.items??[]).map(i=><tr key={i.id}><td>{i.procedure_name}</td><td>{i.tooth_number??'—'}</td>
-    <td>{i.quantity}</td><td>{money(Number(i.unit_price)*i.quantity-Number(i.discount))}</td><td>{i.status}</td></tr>)}</tbody></table>
+    <td>{i.quantity}</td><td>{money(Number(i.unit_price)*i.quantity-Number(i.discount))}</td><td>
+     {i.status}
+     {detail.status==='IN_PROGRESS'&&i.status==='PLANNED'&&
+      <button type="button" disabled={busy} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items/${i.id}/progress`,{
+        method:'POST',body:JSON.stringify({status:'SCHEDULED'})
+      }))}>Mark scheduled</button>}
+     {detail.status==='IN_PROGRESS'&&['PLANNED','SCHEDULED'].includes(i.status)&&
+      <button type="button" disabled={busy||!visitId} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items/${i.id}/progress`,{
+        method:'POST',body:JSON.stringify({status:'COMPLETED',visitId})
+      }))}>Record completed treatment</button>}
+    </td></tr>)}</tbody></table>
+   {detail.status==='IN_PROGRESS'&&<label>Completed patient encounter for item evidence
+      <select value={visitId} onChange={e=>setVisitId(e.target.value)}><option value="">Choose completed encounter</option>
+       {encounters.filter(e=>e.encounter_status==='COMPLETED').map(e=><option key={e.id} value={e.id}>{new Date(e.started_at).toLocaleString()}</option>)}
+      </select></label>}
    {detail.status==='DRAFT'&&<div>
     <h4>Add procedure</h4><label>Procedure <select value={procedure} onChange={e=>{
       setProcedure(e.target.value);setPrice(Number(catalog.find(p=>p.id===e.target.value)?.default_price??0))
