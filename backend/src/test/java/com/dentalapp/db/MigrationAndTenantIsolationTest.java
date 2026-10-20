@@ -119,6 +119,19 @@ class MigrationAndTenantIsolationTest {
                                 'encounter_prescription_draft','encounter_document_reference')
               AND policyname='tenant_isolation'
             """,Integer.class)).isEqualTo(4);
+        // M6 clinical plan history is forced-RLS and has tenant-owned immutable records.
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_class WHERE relname='treatment_plan_event' AND relrowsecurity AND relforcerowsecurity
+            """,Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_policies WHERE schemaname=current_schema()
+              AND tablename='treatment_plan_event' AND policyname='tenant_isolation'
+            """,Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_trigger WHERE tgname IN ('treatment_plan_event_immutable',
+              'treatment_plan_item_no_delete','treatment_plan_item_price_lock')
+              AND NOT tgisinternal
+            """,Integer.class)).isEqualTo(3);
         // A platform-wide session must not bypass tenant RLS for clinical records.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND policyname='platform_admin_access'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='staff_invitation' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
