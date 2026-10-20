@@ -52,7 +52,7 @@ export function SchedulingWorkspace({ role, mode = 'calendar' }: { role: Workspa
   const manager = role === 'OWNER' || role === 'ADMIN'
   useEffect(() => { let active = true; void api<Branch[]>('/api/clinic-management/branches').then(rows => { if (active) { setBranches(rows); setBranch(rows[0]?.id ?? '') } }).catch(e => { if (active) setNotice(String(e)) }); return () => { active = false } }, [])
   useEffect(() => { if (!branch) return; let active = true
-    void Promise.all([api<{ dentists: Resource[]; chairs: Resource[] }>(`${endpoint}/resources?branchId=${branch}`), api<Type[]>(`${endpoint}/types`)]).then(([r, t]) => { if (active) { setDentists(r.dentists); setChairs(r.chairs); setTypes(t) } }).catch(e => { if (active) setNotice(String(e)) }); return () => { active = false }
+    void Promise.all([api<{ dentists: Resource[]; chairs: Resource[] }>(`${endpoint}/resources?branchId=${branch}`), api<Type[]>(`${endpoint}/types`)]).then(([r, t]) => { if (active) { setDentists(Array.isArray(r?.dentists) ? r.dentists : []); setChairs(Array.isArray(r?.chairs) ? r.chairs : []); setTypes(Array.isArray(t) ? t : []); if (!Array.isArray(r?.dentists) || !Array.isArray(r?.chairs)) setNotice('Scheduling resource response is unavailable or invalid') } }).catch(e => { if (active) setNotice(String(e)) }); return () => { active = false }
   }, [branch, refresh])
   useEffect(() => { if (!branch) return; let active = true
     const timer = setTimeout(() => {
