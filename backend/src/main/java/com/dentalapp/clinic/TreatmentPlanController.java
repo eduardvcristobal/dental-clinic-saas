@@ -159,6 +159,7 @@ public class TreatmentPlanController {
  public Map<String,Object> billingPreview(Authentication a,@PathVariable UUID id){
   Map<String,Object> plan=detail(a,id);
   // Preview only: billing is M7, no invoice or payment is created here.
-  return Map.of("planId",id,"currency","PHP","estimateTotal",plan.get("estimate_total"),"invoiceCreated",false);
+  String currency=db.queryForObject("SELECT currency FROM clinic WHERE id=?",String.class,clinician(a).clinicId());
+  return Map.of("planId",id,"currency",currency==null?"PHP":currency.trim(),"estimateTotal",plan.get("estimate_total"),"invoiceCreated",false);
  }
 }
