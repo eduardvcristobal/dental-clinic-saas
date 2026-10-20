@@ -1,5 +1,5 @@
 import { describe,expect,it } from 'vitest'
-import { teethFor,surfaceOptions } from './Odontogram'
+import { teethFor,surfaceOptions } from './odontogram'
 
 describe('dentition selection',()=>{
  it('includes 32 permanent FDI identifiers',()=>{
