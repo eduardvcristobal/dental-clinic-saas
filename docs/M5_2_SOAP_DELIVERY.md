@@ -28,3 +28,17 @@ Scope: **draft clinical documentation only**. Signed notes, amendments, prescrip
 - Java 17 Maven unit/integration regression; frontend TS/lint/Vitest/build.
 - Standard and M4 real-backend browser suites; M5-specific real-backend SOAP workflow is still a separate acceptance gate.
 - OWASP/NVD and production privacy/clinical validation remain deferred.
+
+## Verified GitHub Actions — development baseline
+- Source SHA: `1c6b13cde2f2533b33953e138cbc8b67dffa3c03`
+- [Workflow run 39378743729](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39378743729)
+- Java 17 + PostgreSQL 16: **PASS**, 92 tests total, 80 executed, 12 skipped; zero failures. Fresh Flyway V1–V26 migration and forced RLS assertions succeeded.
+- Frontend: **PASS**, TypeScript/lint/Vitest/build, 42 tests.
+- Browser: **PASS**, standard Chromium Playwright suite (M1 and M4 scenarios).
+- Real-backend M4 clinical browser E2E: **PASS**, 1 synthetic test against Spring Boot and PostgreSQL.
+- Gitleaks: **PASS**.
+- Dedicated M5 SOAP authenticated browser E2E: **NOT RUN**; add before M5.6.
+- OWASP/NVD: **DEFERRED**; private GitHub dependency-review gate unavailable. Do not infer production security clearance.
+- M3 environment-gated legacy tests: 12 skips in backend run; do not report those as PASS.
+
+Development M5.2 functionality is implemented and current CI gates pass; clinical acceptance remains conditional on M5.6 and owner review. No real patient data.
