@@ -106,6 +106,19 @@ class MigrationAndTenantIsolationTest {
             WHERE grantee='dental_app' AND privilege_type='INSERT'
               AND table_name IN ('encounter_soap_draft','encounter_soap_revision','encounter_diagnosis')
             """,Integer.class)).isEqualTo(3);
+        // M5.3–M5.4: clinical signed documents and prescriptions are tenant isolated.
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
+              AND c.relname IN ('encounter_signed_note','encounter_note_amendment',
+                                'encounter_prescription_draft','encounter_document_reference')
+            """,Integer.class)).isEqualTo(4);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_policies WHERE schemaname=current_schema()
+              AND tablename IN ('encounter_signed_note','encounter_note_amendment',
+                                'encounter_prescription_draft','encounter_document_reference')
+              AND policyname='tenant_isolation'
+            """,Integer.class)).isEqualTo(4);
         // A platform-wide session must not bypass tenant RLS for clinical records.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND policyname='platform_admin_access'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='staff_invitation' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
