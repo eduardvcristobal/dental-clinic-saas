@@ -56,7 +56,7 @@ class MigrationAndTenantIsolationTest {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
         assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-                "16", "17", "18", "19", "20", "21", "22", "23");
+                "16", "17", "18", "19", "20", "21", "22", "23", "24");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
@@ -193,6 +193,8 @@ class MigrationAndTenantIsolationTest {
                 UUID correction=UUID.randomUUID();
                 st.execute("INSERT INTO odontogram_finding_event(id,clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,recorded_by,supersedes_event_id) VALUES " +
                     "('"+correction+"','"+clinicA+"','"+chartA+"','"+patientA+"',11,'I','RESTORATION','CORRECTION','"+userA+"','"+findingA+"')");
+                assertSqlRejected(app,st,"INSERT INTO odontogram_finding_event(clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,recorded_by,supersedes_event_id) VALUES " +
+                    "('"+clinicA+"','"+chartA+"','"+patientA+"',12,'I','CROWN','CORRECTION','"+userA+"','"+correction+"')");
                 assertSqlRejected(app,st,"INSERT INTO odontogram_finding_event(clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,recorded_by,supersedes_event_id) VALUES " +
                     "('"+clinicA+"','"+chartA+"','"+patientA+"',11,'I','CROWN','CORRECTION','"+userA+"','"+findingA+"')");
             }
