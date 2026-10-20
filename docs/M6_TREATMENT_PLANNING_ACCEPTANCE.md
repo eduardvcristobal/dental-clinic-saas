@@ -64,3 +64,27 @@ Status: SOURCE IMPLEMENTED — final hosted CI review required
 3. Reconcile M5, rerun CI, merge M5 after owner's approval.
 4. PR #3 (M6) targets M5. Retarget to main only when upstream is accepted; run CI against final merge commit.
 5. Never auto-merge. Avoid uploading real patient data or secrets.
+
+
+## Hosted regression closure — 2026-10-20
+
+**Application-code SHA:** `e2cfbb113a37bea83cdb0c9081f8f315038ac05c`
+**GitHub Actions evidence:** [Workflow 39387827145](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39387827145)
+
+| Gate | Verified outcome |
+|---|---|
+| Java 17 Maven & PostgreSQL 16 | PASS: 106 tests, 94 executed, 12 environment-gated skips, zero failures; BUILD SUCCESS |
+| Fresh Flyway V1–V31 with restricted app DB role | PASS: migration integration test and forced RLS/immutability checks |
+| React TypeScript, ESLint, Vitest, Vite build | PASS: 42 frontend tests |
+| Chromium standard browser suite | PASS: 6 tests |
+| Real Spring Boot + PostgreSQL 16 + synthetic Google JWKS | PASS: 3 clinical browser tests (M4, M5, M6) |
+| M6 real-backend clinical workflow | PASS: procedure selection, estimate, consent reference, completion evidence, progress, cross-clinic denial, FRONT_DESK denial, Patient 360 rendering |
+| Gitleaks | PASS |
+| OWASP/NVD | SKIPPED/DEFERRED (M10 exception; not a security PASS) |
+| Earlier environment-gated scheduling/migration tests | 12 SKIPPED, not certified by this run |
+| Firefox/WebKit | NOT RUN |
+| Clinical production, qualified consent and payment compliance | NOT CERTIFIED |
+
+**Development outcome:** M6.1–M6.7 are implemented to the extent documented above and the tested application code passed all enabled hosted CI gates. M6.5 scheduling is progress notation only; actual appointment reservation linkage remains future work. M6.6 provides read-only billing preview, not invoice creation. M6 consent uses a record reference rather than verified patient attestation. These are explicit product gaps, not silent successes.
+
+**Merge:** PR #3 remains draft, stacked on M5. M3→M4→M5 reconciliation, owner review, and final merged-base CI are prerequisites. `main` is not changed.
