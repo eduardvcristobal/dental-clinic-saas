@@ -15,3 +15,4 @@ Hosted GitHub Actions (verified via gh API):
 - Run 39348777480 "Backend Java 17", commit a5894c2fe765d3d9b18df3f1c3d3d9894aba364e, push event 2026-10-20T00:37:52Z, conclusion SUCCESS.
 - java17: success (ID 118387720854) | frontend: success (118387721062) | browser: success (118387721168) | security: success (118387721229) | owasp: skipped (118387722177, opt-in job, vars not configured).
 - Notes: HTTPS push initially rejected for missing workflow OAuth scope; pivoted push to SSH (key authorized via gh). No secret was displayed or modified.
+- Run 39349377386 (docs commit 2a2728e): same job conclusions — java17/frontend/browser/security success, owasp skipped. Hosted CI verified green on the final main commit.

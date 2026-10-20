@@ -24,4 +24,8 @@ Date checked: 2026-10-20 · Repository: `eduardvcristobal/dental-clinic-saas` ·
 
 Verification method: `gh run view 39348777480 --json …` with per-job `conclusion` values read directly from the GitHub API — claimed conclusions above are copied verbatim from that response.
 
+## Run 39349377386 — final commit re-check
+
+The documentation-and-evidence commit `2a2728e` (later push) triggered the same workflow, and its run completed with the **same conclusions**: java17/frontend/browser/security success, owasp skipped. So the hosted result above is confirmed against the repository's final state on `main`, not only the application-code commit.
+
 Dependency-scan disclaimer: the hosted run did not perform the NVD dependency scan (opt-in job skipped). The Maven-side scan evidence lives in the local M2.5.1 triage report; both leave the same residual upstream-unfixed set to re-check at M10.
