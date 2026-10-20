@@ -19,7 +19,7 @@ export const WORKSPACE_MODULES: WorkspaceModule[] = [
   { id: 'billing', title: 'Billing', group: 'Revenue', description: 'Invoices and collections', state: 'preview', roles: ALL },
   { id: 'installments', title: 'Installments', group: 'Revenue', description: 'Payment schedules', state: 'coming-soon', roles: ALL },
   { id: 'price-list', title: 'Procedure Price List', group: 'Revenue', description: 'Services and pricing', state: 'coming-soon', roles: ADMIN },
-  { id: 'reminders', title: 'Reminders & Recalls', group: 'Growth', description: 'Appointment reminders and recalls', state: 'coming-soon', roles: ALL },
+  { id: 'reminders', title: 'Reminders & Recalls', group: 'Growth', description: 'Opt-in reminder queue, clinic consent and recalls (external sending disabled)', state: 'active', roles: ALL },
   { id: 'reports', title: 'Reports', group: 'Growth', description: 'Production and collections insights', state: 'preview', roles: ADMIN },
   { id: 'patient-portal', title: 'Patient Portal', group: 'Growth', description: 'Future patient self-service', state: 'coming-soon', roles: ADMIN },
   { id: 'branches', title: 'Branches', group: 'Administration', description: 'Clinic locations and operating hours', state: 'active', roles: ADMIN },
