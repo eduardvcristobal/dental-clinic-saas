@@ -274,8 +274,11 @@ public class BillingController {
   BigDecimal received=db.queryForObject("SELECT coalesce(sum(p.amount-coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)),0) FROM payment p WHERE p.clinic_id=? AND p.voided_at IS NULL",
    BigDecimal.class,c);
   BigDecimal outstanding=invoiced.subtract(received);
-  BigDecimal today=db.queryForObject("SELECT coalesce(sum(p.amount-coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)),0) FROM payment p WHERE p.clinic_id=? AND p.voided_at IS NULL AND p.paid_at>=date_trunc('day',now())",
+  BigDecimal today=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND voided_at IS NULL AND paid_at>=date_trunc('day',now())",
    BigDecimal.class,c);
+  // Today's cashflow is measured at the event date, not the original payment date.
+  BigDecimal refundsToday=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment_refund WHERE clinic_id=? AND refunded_at>=date_trunc('day',now())",BigDecimal.class,c);
+  today=today.subtract(refundsToday);
   String currency=db.queryForObject("SELECT currency FROM clinic WHERE id=?",String.class,c);
   var methods=db.queryForList("SELECT p.method,sum(p.amount-coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)) AS amount FROM payment p WHERE p.clinic_id=? AND p.voided_at IS NULL GROUP BY p.method ORDER BY p.method",
    c);
