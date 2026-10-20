@@ -64,6 +64,9 @@ INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES
  ('44000000-0000-4000-8000-000000000032','44000000-0000-4000-8000-000000000002','M4-B1','Other','Clinic Patient');
 INSERT INTO dentist(id,clinic_id,user_id,full_name,active) VALUES
  ('44000000-0000-4000-8000-000000000041','44000000-0000-4000-8000-000000000001','44000000-0000-4000-8000-000000000021','Synthetic Test Dentist',true);
+INSERT INTO procedure_catalog(id,clinic_id,code,name,category,default_price,requires_tooth,requires_surface,active) VALUES
+ ('44000000-0000-4000-8000-000000000051','44000000-0000-4000-8000-000000000001','M6-TEST','Synthetic Dental Restoration','Restorative',1500.00,true,false,true);
+
 
 SQL
 cd "$ROOT/frontend"
