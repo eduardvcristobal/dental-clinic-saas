@@ -433,3 +433,27 @@ Changes are limited to the M4 branch. Do not interpret an unrun test as passed, 
 The M4 feature branch passed hosted CI on application-code commit `a8ca311`, [GitHub Actions run 39374343574](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39374343574): Java 17/Maven 79 tests (67 executed, 12 environment-gated skips), fresh PostgreSQL 16 V1–V24 migration and V21→V24 legacy preservation, restricted-role RLS and clinical history integrity, frontend 42 Vitest tests with typecheck/lint/build, 6 mocked Chromium Playwright tests and 1 real Spring Boot/PostgreSQL odontogram E2E using synthetic local Google JWKS. Gitleaks passed. Detailed job evidence: `docs/M4_5_ODONTOGRAM_ACCEPTANCE.md`.
 
 **M4 development readiness:** COMPLETE FOR DEVELOPMENT **on feature branch**, pending independent PR review, M3.10 baseline reconciliation and explicit owner approval before merging. No real patient data or clinical production use. Maven OWASP/NVD remains DEFERRED to M10, private-repo Dependency Review is unavailable, 12 unrelated environment-gated backend tests remain skipped, Firefox/WebKit clinical browser tests are not yet run. The legacy V4 tooth records are retained but not backfilled to M4 history.
+
+
+## M5.2 — SOAP draft documentation and clinical diagnoses (2026-10-20)
+
+**Implemented on feature branch `feature/m5-clinical-encounters`; NOT merged.** V26 creates tenant-isolated SOAP drafts, append-only revisions and structured diagnoses. Clinician-restricted APIs enforce optimistic version updates, preserve every draft revision and block edits to finalized/locked encounters. Patient 360 contains draft SOAP/diagnosis interface.
+
+**Runtime results** for application commit `1c6b13c`: [GitHub Actions run 39378743729](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39378743729): Java 17/PG16 passed (92 tests, 80 executed, 12 skipped), frontend passed (42 Vitest), standard Playwright passed, prior real-backend M4 E2E passed, Gitleaks passed. M5-specific real HTTP/browser authoring E2E remains OPEN; M3 gated tests skipped, OWASP/NVD deferred.
+
+**Next milestones:** M5.3 signing/locking/amendments, M5.4 prescriptions/files, M5.5 odontogram/encounter UX integration, M5.6 comprehensive acceptance. Owner authorization needed before any PR merge; no production patient data. See `docs/M5_2_SOAP_DELIVERY.md`.
+
+
+## M5.3–M5.6 — Clinical workflow development validation, October 20, 2026
+
+**Branch:** `feature/m5-clinical-encounters` (stacked on M4; `main` unchanged).
+**Status:** DEVELOPMENT IMPLEMENTATION TESTED; MERGE APPROVAL / PRODUCTION CERTIFICATION PENDING.
+
+- [x] M5.3: immutable signed SOAP snapshot, authenticated sign-off, note locking and append-only amendments (V27).
+- [~] M5.4: prescription **draft** API + secure-identifier document metadata foundation (V28); real upload, secure storage and prescription transmission are NOT implemented.
+- [x] M5.5: same-patient visit attribution for tooth-finding events and encounter UI (V29), no invented historic associations.
+- [x] M5.6: Java 17/PostgreSQL 16, frontend, browser, clinical E2E and Gitleaks run on application SHA `ee83add`.
+
+[GitHub Actions 39383121391](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39383121391): Java 101 total (89 executed, 12 gated skips) zero failures; frontend 42 unit tests; 6 standard Chromium + 2 real Spring Boot/PostgreSQL browser tests; security Gitleaks passed. OWASP/NVD deferred and private-repo Dependency Review unavailable. Firefox/WebKit, production Google, external file storage and electronic prescribing remain unverified. Signed-note attestation is NOT a qualified cryptographic signature.
+
+**Merge gate:** M3 acceptance → M4 PR review/merge → reconcile M5 → rerun CI → explicit owner approval. Not production-certified. See `docs/M5_6_CLINICAL_ACCEPTANCE.md`.

@@ -20,7 +20,13 @@ public class OdontogramController {
     public OdontogramController(JdbcTemplate db) { this.db = db; }
 
     public record FindingInput(Integer toothNumber, String surface, String conditionCode,
-                               String clinicalStatus, String notes, String eventKind, UUID supersedesEventId) {}
+                               String clinicalStatus, String notes, String eventKind, UUID supersedesEventId,
+                               UUID encounterVisitId) {
+        public FindingInput(Integer toothNumber, String surface, String conditionCode,
+                            String clinicalStatus, String notes, String eventKind, UUID supersedesEventId) {
+            this(toothNumber,surface,conditionCode,clinicalStatus,notes,eventKind,supersedesEventId,null);
+        }
+    }
 
     private AuthPrincipal clinician(Authentication auth) {
         if (auth == null || !(auth.getPrincipal() instanceof AuthPrincipal p)
@@ -65,7 +71,7 @@ public class OdontogramController {
         List<Map<String,Object>> charts = db.queryForList(
             "SELECT id,created_at FROM odontogram_chart WHERE clinic_id=? AND patient_id=?",clinic,patientId);
         List<Map<String,Object>> findings = db.queryForList(
-            "SELECT id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_at,recorded_by,supersedes_event_id "+
+            "SELECT id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_at,recorded_by,supersedes_event_id,encounter_visit_id "+
             "FROM odontogram_finding_event WHERE clinic_id=? AND patient_id=? ORDER BY recorded_at,id",
             clinic,patientId);
         Map<String,Object> result = new LinkedHashMap<>();
@@ -88,6 +94,11 @@ public class OdontogramController {
         if (("OBSERVATION".equals(k)) != (input.supersedesEventId() == null))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Corrections and retractions require an original event");
 
+        if(input.encounterVisitId()!=null && !Boolean.TRUE.equals(db.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM visit WHERE clinic_id=? AND id=? AND patient_id=? "+
+            "AND encounter_status='IN_PROGRESS' AND locked_at IS NULL)",Boolean.class,
+            clinic,input.encounterVisitId(),patientId)))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Encounter not active for this patient");
         db.update("INSERT INTO odontogram_chart(clinic_id,patient_id,created_by) VALUES(?,?,?) "+
                   "ON CONFLICT(clinic_id,patient_id) DO NOTHING",clinic,patientId,p.userId());
         UUID chartId = db.queryForObject("SELECT id FROM odontogram_chart WHERE clinic_id=? AND patient_id=?",
@@ -110,14 +121,14 @@ public class OdontogramController {
         UUID eventId=UUID.randomUUID();
         try {
             db.update("INSERT INTO odontogram_finding_event "+
-                "(id,clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_by,supersedes_event_id) "+
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",eventId,clinic,chartId,patientId,input.toothNumber(),
-                input.surface(),input.conditionCode().trim(),k,s,input.notes(),p.userId(),input.supersedesEventId());
+                "(id,clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_by,supersedes_event_id,encounter_visit_id) "+
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",eventId,clinic,chartId,patientId,input.toothNumber(),
+                input.surface(),input.conditionCode().trim(),k,s,input.notes(),p.userId(),input.supersedesEventId(),input.encounterVisitId());
         } catch (DataIntegrityViolationException conflict) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Clinical finding conflicts with an existing record or concurrent correction");
         }
-        return db.queryForMap("SELECT id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_at,recorded_by,supersedes_event_id "+
+        return db.queryForMap("SELECT id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_at,recorded_by,supersedes_event_id,encounter_visit_id "+
                               "FROM odontogram_finding_event WHERE clinic_id=? AND patient_id=? AND id=?",clinic,patientId,eventId);
     }
 }

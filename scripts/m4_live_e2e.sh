@@ -30,7 +30,7 @@ JWKS_PID=$!
 export DB_URL="jdbc:postgresql://$PGHOST:$PGPORT/$DB_NAME"
 export DB_OWNER_USER="$PGUSER" DB_OWNER_PASSWORD="$OWNER_PASSWORD" DB_APP_USER=dental_app DB_APP_PASSWORD="$APP_PASSWORD"
 export GOOGLE_CLIENT_ID='m25-live-test-client' GOOGLE_JWK_SET_URI="http://127.0.0.1:$JWKS_PORT/keys"
-export APP_JWT_SECRET='m4-synthetic-jwt-secret-at-least-32-characters' APP_COOKIE_SECURE=false
+export APP_JWT_SECRET="$(openssl rand -hex 32)" APP_COOKIE_SECURE=false
 export APP_ALLOWED_ORIGINS="http://127.0.0.1:$FRONTEND_PORT" SERVER_PORT="$BACKEND_PORT"
 export LOGGING_LEVEL_ROOT=WARN
 java -jar "$ROOT/backend/target/dental-backend-0.1.0.jar" --logging.level.root=WARN >"$BACKEND_LOG" 2>&1 &
@@ -62,6 +62,9 @@ INSERT INTO app_user(id,clinic_id,email,password_hash,full_name,role,active) VAL
 INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES
  ('44000000-0000-4000-8000-000000000031','44000000-0000-4000-8000-000000000001','M4-A1','Synthetic','Chart Patient'),
  ('44000000-0000-4000-8000-000000000032','44000000-0000-4000-8000-000000000002','M4-B1','Other','Clinic Patient');
+INSERT INTO dentist(id,clinic_id,user_id,full_name,active) VALUES
+ ('44000000-0000-4000-8000-000000000041','44000000-0000-4000-8000-000000000001','44000000-0000-4000-8000-000000000021','Synthetic Test Dentist',true);
+
 SQL
 cd "$ROOT/frontend"
 M4_BACKEND_URL="http://127.0.0.1:$BACKEND_PORT" M4_JWKS_URL="http://127.0.0.1:$JWKS_PORT" M4_FRONTEND_PORT="$FRONTEND_PORT" \

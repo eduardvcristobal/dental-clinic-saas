@@ -24,7 +24,7 @@ class OdontogramMigrationUpgradeTest {
       st.execute("INSERT INTO patient(id,clinic_id,chart_no,first_name,last_name) VALUES ('"+patient+"','"+c+"','M4-001','Synthetic','Patient')");
       st.execute("INSERT INTO tooth_record(id,clinic_id,patient_id,tooth_number,surface,condition_code,recorded_by) VALUES ('"+legacy+"','"+c+"','"+patient+"',11,'I','CARIES','"+staff+"')");
     }
-    Flyway.configure().dataSource(url,user,pwd).load().migrate();
+    Flyway.configure().dataSource(url,user,pwd).target(MigrationVersion.fromVersion("24")).load().migrate();
     try(var con=DriverManager.getConnection(url,user,pwd);var st=con.createStatement()) {
       try(var rs=st.executeQuery("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1")) {
         assertThat(rs.next()).isTrue();assertThat(rs.getString(1)).isEqualTo("24");
