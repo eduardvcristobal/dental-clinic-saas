@@ -19,6 +19,7 @@ public final class ProviderNotificationTransport implements NotificationTranspor
  private final HttpClient http;
  private final boolean enabled;
  private final String resendKey,fromEmail,twilioSid,twilioToken,fromPhone;
+ @org.springframework.beans.factory.annotation.Autowired
  public ProviderNotificationTransport(
   @Value("${app.notifications.outbound-enabled:false}") boolean enabled,
   @Value("${app.notifications.resend-api-key:}") String resendKey,
