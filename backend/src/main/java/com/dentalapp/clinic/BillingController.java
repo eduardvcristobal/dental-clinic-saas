@@ -280,4 +280,21 @@ public class BillingController {
    "collectionsToday",today,"paymentMethods",methods);
  }
 
+ @GetMapping("/patients/{patientId}/plans") @Transactional(readOnly=true)
+ public List<Map<String,Object>> billablePlans(Authentication a,@PathVariable UUID patientId){
+  AuthPrincipal p=cashier(a);UUID c=p.clinicId();
+  if(!exists("patient",c,patientId))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Patient not found");
+  return db.queryForList("SELECT id,title,status FROM treatment_plan WHERE clinic_id=? AND patient_id=? AND status IN ('ACCEPTED','IN_PROGRESS','COMPLETED') ORDER BY created_at DESC LIMIT 100",
+   c,patientId);
+ }
+ @GetMapping("/invoices/{id}/plan-charges") @Transactional(readOnly=true)
+ public List<Map<String,Object>> billablePlanItems(Authentication a,@PathVariable UUID id){
+  AuthPrincipal p=cashier(a);UUID c=p.clinicId();var bill=invoice(c,id,false);
+  if(bill.get("plan_id")==null)return List.of();
+  return db.queryForList("SELECT i.id,p.name AS procedure_name,i.status FROM treatment_plan_item i "+
+   "JOIN procedure_catalog p ON p.clinic_id=i.clinic_id AND p.id=i.procedure_id "+
+   "WHERE i.clinic_id=? AND i.plan_id=? AND i.status='COMPLETED' ORDER BY i.created_at,i.id",
+   c,bill.get("plan_id"));
+ }
+
 }
