@@ -6,7 +6,7 @@ type Procedure={id:string;name:string;code:string;default_price:number;requires_
 type Dentist={id:string;full_name:string}
 type Encounter={id:string;encounter_status:string;started_at:string}
 const money=(value:number,currency:string)=>new Intl.NumberFormat('en',{style:'currency',currency}).format(value)
-export function PatientTreatmentPlans({patientId}:{patientId:string}){
+export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:string}){
  const [plans,setPlans]=useState<Plan[]>([])
  const [currency,setCurrency]=useState('PHP')
  const [selected,setSelected]=useState('')
@@ -16,6 +16,7 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
  const [encounters,setEncounters]=useState<Encounter[]>([])
  const [visitId,setVisitId]=useState('')
  const [title,setTitle]=useState('');const [dentistId,setDentistId]=useState('')
+ const [newCode,setNewCode]=useState('');const [newName,setNewName]=useState('');const [newPrice,setNewPrice]=useState(0);const [requiresTooth,setRequiresTooth]=useState(false)
  const [procedure,setProcedure]=useState('');const [tooth,setTooth]=useState('')
  const [qty,setQty]=useState(1);const [price,setPrice]=useState(0);const [discount,setDiscount]=useState(0)
  const [consent,setConsent]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false)
@@ -43,10 +44,29 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
  const execute=async(action:()=>Promise<unknown>)=>{setBusy(true);setError('')
   try{await action();await refresh()}catch(e){setError(e instanceof Error?e.message:'Request failed')}finally{setBusy(false)}
  }
+ async function createProcedure(){
+  setBusy(true);setError('')
+  try{
+   await api('/api/treatment-plans/catalog',{method:'POST',body:JSON.stringify({
+     code:newCode,name:newName,category:'General',defaultPrice:newPrice,requiresTooth,requiresSurface:false
+   })})
+   setCatalog(await api<Procedure[]>('/api/treatment-plans/catalog'))
+   setNewCode('');setNewName('');setNewPrice(0);setRequiresTooth(false)
+  }catch(e){setError(e instanceof Error?e.message:'Could not add procedure')}
+  finally{setBusy(false)}
+ }
  const chosen=catalog.find(p=>p.id===procedure)
  return <section className="ws-panel ws-management" aria-label="Dental treatment planning">
   <h3>Dental Treatment Plans</h3><p>Clinical estimates only. No invoice or payment is created here.</p>
   {error&&<p role="alert">{error}</p>}
+  {['OWNER','ADMIN'].includes(role)&&<section aria-label="Manage procedure catalog">
+   <h4>Procedure catalog</h4>
+   <label>Procedure code <input value={newCode} maxLength={80} onChange={e=>setNewCode(e.target.value)}/></label>
+   <label>Procedure name <input value={newName} maxLength={255} onChange={e=>setNewName(e.target.value)}/></label>
+   <label>Default estimate price <input type="number" min={0} step=".01" value={newPrice} onChange={e=>setNewPrice(Number(e.target.value))}/></label>
+   <label><input type="checkbox" checked={requiresTooth} onChange={e=>setRequiresTooth(e.target.checked)}/> Requires a tooth</label>
+   <button disabled={busy||!newCode.trim()||!newName.trim()||newPrice<0} onClick={()=>void createProcedure()}>Add clinic procedure</button>
+  </section>}
   <h4>Start treatment plan</h4>
   <label>Plan title <input value={title} maxLength={255} onChange={e=>setTitle(e.target.value)}/></label>
   <label>Dentist <select value={dentistId} onChange={e=>setDentistId(e.target.value)}><option value="">Choose dentist</option>
@@ -71,7 +91,7 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
      {detail.status==='IN_PROGRESS'&&i.status==='PLANNED'&&
       <button type="button" disabled={busy} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items/${i.id}/progress`,{
         method:'POST',body:JSON.stringify({status:'SCHEDULED'})
-      }))}>Mark scheduled</button>}
+      }))}>Mark planned scheduling status (not a booking)</button>}
      {detail.status==='IN_PROGRESS'&&['PLANNED','SCHEDULED'].includes(i.status)&&
       <button type="button" disabled={busy||!visitId} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items/${i.id}/progress`,{
         method:'POST',body:JSON.stringify({status:'COMPLETED',visitId})
