@@ -56,6 +56,7 @@ public class SchedulingController {
         String value=db.queryForObject("SELECT timezone FROM clinic WHERE id=?",String.class,clinic);
         return ZoneId.of(value);
     }
+    private static Instant instant(Object value) { return value instanceof Instant i ? i : ((java.util.Date)value).toInstant(); }
     private void validateWindow(Instant from,Instant to) {
         require(from!=null && to!=null && to.isAfter(from) && Duration.between(from,to).toHours()<25,"Invalid time interval");
     }
@@ -141,7 +142,7 @@ public class SchedulingController {
     }
     @GetMapping("/calendar") @Transactional(readOnly=true)
     public List<Map<String,Object>> calendar(Authentication a,@RequestParam UUID branchId,@RequestParam Instant from,@RequestParam Instant to) {
-        UUID c=clinic(a);validateWindow(from,to);require(Duration.between(from,to).toDays()<=32,"Calendar range too long");
+        UUID c=clinic(a);require(from!=null&&to!=null&&to.isAfter(from)&&Duration.between(from,to).toDays()<=32,"Invalid calendar range");
         return db.queryForList("SELECT a.id,a.branch_id,a.patient_id,p.first_name,p.last_name,a.dentist_id,d.full_name AS dentist_name,a.chair_id,a.appointment_type_id,a.starts_at,a.ends_at,a.status,a.reason,a.version FROM appointment a JOIN patient p ON p.id=a.patient_id AND p.clinic_id=a.clinic_id JOIN dentist d ON d.id=a.dentist_id AND d.clinic_id=a.clinic_id WHERE a.clinic_id=? AND a.branch_id=? AND a.starts_at<? AND a.ends_at>? ORDER BY a.starts_at,a.id",c,branchId,to,from);
     }
     @PostMapping("/appointments") @ResponseStatus(HttpStatus.CREATED) @Transactional
@@ -168,7 +169,7 @@ public class SchedulingController {
         require(next!=null&&transitions.getOrDefault(current,Set.of()).contains(next),"Unsupported status transition");
         int n=db.update("UPDATE appointment SET status=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND id=? AND version=?",next,p.clinicId(),id,((Number)old.get("version")).longValue());
         if(n==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Appointment changed");
-        event(p,id,"STATUS",current,next,(Instant)old.get("starts_at"),(Instant)old.get("starts_at"),input.reason());
+        event(p,id,"STATUS",current,next,instant(old.get("starts_at")),instant(old.get("starts_at")),input.reason());
         if(next.equals("CANCELLED")||next.equals("CONFIRMED"))notice(p,id,next);
         return appointment(a,id);
     }
@@ -180,7 +181,7 @@ public class SchedulingController {
         validateSchedule(p.clinicId(),candidate);
         try { int n=db.update("UPDATE appointment SET starts_at=?,ends_at=?,reason=?,updated_at=now(),version=version+1 WHERE id=? AND clinic_id=? AND version=?",input.startsAt(),input.endsAt(),input.reason(),id,p.clinicId(),((Number)old.get("version")).longValue());if(n==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Appointment changed"); }
         catch(DataIntegrityViolationException e){throw new ResponseStatusException(HttpStatus.CONFLICT,"Slot already booked");}
-        event(p,id,"RESCHEDULED",status,status,(Instant)old.get("starts_at"),input.startsAt(),input.reason());notice(p,id,"RESCHEDULED");return appointment(a,id);
+        event(p,id,"RESCHEDULED",status,status,instant(old.get("starts_at")),input.startsAt(),input.reason());notice(p,id,"RESCHEDULED");return appointment(a,id);
     }
     @GetMapping("/appointments/{id}/events") @Transactional(readOnly=true)
     public List<Map<String,Object>> events(Authentication a,@PathVariable UUID id) {
