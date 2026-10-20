@@ -57,6 +57,9 @@ async function installApiFixtures(page: Page, options: { rejectSignIn?: boolean 
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
         { id: clinic.id, slug: clinic.slug, name: clinic.name, planCode: 'STARTER', subscriptionStatus: 'TRIAL', active: true, createdAt: '2026-01-01T00:00:00Z', accessScope: 'DIRECTORY_ONLY' },
       ]) })
+    } else if (path === '/api/scheduling/resources') {
+      // Scheduling contract is an object, not an array. Keep the synthetic fixture realistic.
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ dentists: [], chairs: [] }) })
     } else if (path === '/api/clinic-management/clinic') {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...clinic, timezone: 'Asia/Manila', currency: 'PHP', email: null, phone: null, address: null }) })
     } else if (path === '/api/clinic-management/branches') {
