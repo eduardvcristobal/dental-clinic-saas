@@ -28,3 +28,21 @@ Philippines as example jurisdiction, **not an assumption for every clinic**:
 
 ## Verification
 To be filled from CI run after code closure. PR remains draft; do not merge automatically.
+
+## Hosted CI development verification (2026-10-20)
+
+Application-code SHA: `93928994b9af5b2d70689b5f996c055dec02fc90`.
+[GitHub Actions 39430975164](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39430975164)
+
+| Gate | Result |
+|---|---|
+| Java 17 / PostgreSQL 16 + fresh Flyway through V34 | **PASS — 114 backend tests, zero failures, zero skipped** |
+| Frontend TypeScript, lint, build and Vitest | **PASS — 42 tests** |
+| Standard Chromium Playwright | **PASS — 12 tests** |
+| Real Spring Boot/PostgreSQL M4–M7 browser E2E | **PASS — 4 tests** |
+| Synthetic M7 refund, authorization, idempotency and fiscal lockout regression | **PASS** |
+| Gitleaks | **PASS** |
+| OWASP/NVD | **SKIPPED — production gate remains open** |
+| Legal/fiscal certification, external processor integration, production environment | **NOT DONE / NOT CERTIFIED** |
+
+**Decision:** Financial-closure development features are tested and accepted for further code review. Do not treat these implementations as complete official-invoice or legally compliant receipt issuance. External payout evidence is entered manually; no automatic payment provider settlement occurs. PR stays draft until owner review.
