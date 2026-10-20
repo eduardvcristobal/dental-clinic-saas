@@ -1,21 +1,121 @@
-
 version: 2.1
 
 jobs:
-  verify-connection:
+  frontend-quality:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/node:22.14
+    working_directory: ~/project/frontend
     steps:
-      - checkout
+      - checkout:
+          path: ~/project
+      - restore_cache:
+          keys:
+            - frontend-npm-v1-{{ checksum "package-lock.json" }}
       - run:
-          name: Verify GitHub connection
+          name: Install frontend dependencies
+          command: npm ci
+      - save_cache:
+          key: frontend-npm-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - ~/.npm
+      - run:
+          name: Frontend unit tests (Vitest)
+          command: npm test
+      - run:
+          name: Frontend lint (Oxlint)
+          command: npm run lint
+      - run:
+          name: TypeScript and Vite production build
+          command: npm run build
+
+  backend-tests:
+    docker:
+      - image: cimg/openjdk:17.0
+      - image: postgres:16
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: circleci-owner-password
+          POSTGRES_DB: dental
+    working_directory: ~/project/backend
+    environment:
+      DB_URL: jdbc:postgresql://localhost:5432/dental
+      DB_OWNER_USER: postgres
+      DB_OWNER_PASSWORD: circleci-owner-password
+      DB_APP_USER: dental_app
+      DB_APP_PASSWORD: circleci-app-password
+      GOOGLE_CLIENT_ID: circleci-synthetic-client
+      APP_JWT_SECRET: circleci-integration-tests-only-secret-32-bytes-minimum
+      APP_COOKIE_SECURE: "false"
+      APP_ALLOWED_ORIGINS: http://localhost:5173
+      M04_MIGRATION_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m04_migration
+      M04_MIGRATION_TEST_OWNER_USER: postgres
+      M04_MIGRATION_TEST_OWNER_PASSWORD: circleci-owner-password
+      M04_MIGRATION_TEST_APP_PASSWORD: circleci-app-password
+      M04_AUTH_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m04_validation
+      M04_AUTH_TEST_OWNER_USER: postgres
+      M04_AUTH_TEST_OWNER_PASSWORD: circleci-owner-password
+      M04_AUTH_TEST_APP_USER: dental_app
+      M04_AUTH_TEST_APP_PASSWORD: circleci-app-password
+    steps:
+      - checkout:
+          path: ~/project
+      - run:
+          name: Install PostgreSQL client
+          command: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - run:
+          name: Wait for PostgreSQL and initialize disposable test databases
           command: |
-            echo "CircleCI is connected!"
-            echo "Branch: $CIRCLE_BRANCH"
-            echo "Commit: $CIRCLE_SHA1"
-            git status --short
+            export PGPASSWORD="$DB_OWNER_PASSWORD"
+            for i in $(seq 1 60); do
+              if pg_isready -h localhost -U postgres -d dental >/dev/null 2>&1; then break; fi
+              sleep 2
+            done
+            pg_isready -h localhost -U postgres -d dental
+            psql -h localhost -U postgres -d dental -v ON_ERROR_STOP=1 -c "CREATE ROLE dental_app LOGIN PASSWORD 'circleci-app-password' NOSUPERUSER NOBYPASSRLS;"
+            psql -h localhost -U postgres -d dental -v ON_ERROR_STOP=1 -c "GRANT CONNECT ON DATABASE dental TO dental_app;"
+            psql -h localhost -U postgres -d dental -v ON_ERROR_STOP=1 -c "CREATE DATABASE dental_m04_migration;"
+            psql -h localhost -U postgres -d dental -v ON_ERROR_STOP=1 -c "CREATE DATABASE dental_m04_validation;"
+      - restore_cache:
+          keys:
+            - maven-v1-{{ checksum "pom.xml" }}
+      - run:
+          name: Maven tests and package verification
+          command: mvn -B -ntp clean verify
+      - save_cache:
+          key: maven-v1-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2/repository
+      - store_test_results:
+          path: target/surefire-reports
+      - store_artifacts:
+          path: target/surefire-reports
+          destination: backend-test-reports
+
+  browser-regression:
+    docker:
+      - image: mcr.microsoft.com/playwright:v1.64.0-noble
+    working_directory: ~/project/frontend
+    environment:
+      CI: "true"
+    steps:
+      - checkout:
+          path: ~/project
+      - restore_cache:
+          keys:
+            - frontend-npm-v1-{{ checksum "package-lock.json" }}
+      - run:
+          name: Install frontend dependencies
+          command: npm ci
+      - run:
+          name: Run Chromium Playwright regression
+          command: npm run test:e2e
+      - store_artifacts:
+          path: test-results
+          destination: playwright-test-results
 
 workflows:
   build-and-test:
     jobs:
-      - verify-connection
+      - frontend-quality
+      - backend-tests
+      - browser-regression
