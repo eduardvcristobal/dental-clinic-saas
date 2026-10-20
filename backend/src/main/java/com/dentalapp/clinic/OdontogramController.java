@@ -128,7 +128,7 @@ public class OdontogramController {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Clinical finding conflicts with an existing record or concurrent correction");
         }
-        return db.queryForMap("SELECT id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_at,recorded_by,supersedes_event_id "+
+        return db.queryForMap("SELECT id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_at,recorded_by,supersedes_event_id,encounter_visit_id "+
                               "FROM odontogram_finding_event WHERE clinic_id=? AND patient_id=? AND id=?",clinic,patientId,eventId);
     }
 }
