@@ -11,9 +11,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 /** Verifies the supported V14-to-V15 patient data upgrade on an explicitly disposable database. */
-@EnabledIfEnvironmentVariable(named = "M25_UPGRADE_TEST_DB_URL", matches = ".+")
 class MigrationUpgradeTest {
     @Test
+    @EnabledIfEnvironmentVariable(named = "M25_UPGRADE_TEST_DB_URL", matches = ".+")
     void upgradesV14PatientHistoryAndConsentDataToV15WithoutLoss() throws Exception {
         String url = System.getenv("M25_UPGRADE_TEST_DB_URL");
         String user = System.getenv().getOrDefault("M25_UPGRADE_TEST_DB_USER", "postgres");
@@ -49,6 +49,7 @@ class MigrationUpgradeTest {
 
     /** M3.10: verifies the supported V15-to-V21 scheduling schema upgrade without data loss. */
     @Test
+    @EnabledIfEnvironmentVariable(named = "M310_UPGRADE_TEST_DB_URL", matches = ".+")
     void upgradesV15PatientDataToV21SchedulingSchemaWithoutLoss() throws Exception {
         String url = System.getenv("M310_UPGRADE_TEST_DB_URL");
         String user = System.getenv().getOrDefault("M310_UPGRADE_TEST_DB_USER", "postgres");

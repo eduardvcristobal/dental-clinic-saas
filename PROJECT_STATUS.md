@@ -410,3 +410,7 @@ Reports: `docs/M2_5_FINAL_ACCEPTANCE_REPORT.md`, `docs/M2_5_BACKEND_REGRESSION.m
 **Status: IMPLEMENTED IN SOURCE, NOT YET RUNTIME CERTIFIED.** Nine milestone commits completed in sequence. Scheduling includes appointment policies, dentist availability, chair blocks, booking, calendar, lifecycle events, arrival queue, waitlist and notification outbox (without external delivery). Additional correction commits harden resource locking and fix V17 RLS migration quoting. See `docs/M3_1_TO_M3_9_DELIVERY_REPORT.md` for commits and validation limitations.
 
 **M3.10 remains required** for Java 17, Flyway V1–V21/PostgreSQL restricted-role RLS, frontend tests, authenticated browser regression, concurrency, and hosted CI. Synthetic data only. Residual M2.5.1 dependency security findings remain tracked for M10.
+
+## M3.10 — Local scheduling acceptance (2026-10-20)
+
+**Status: LOCAL GATES PASSED; HOSTED CI PENDING.** Java 17 Maven `clean verify` passed 70/70 tests with no skips against fresh disposable PostgreSQL databases. This includes V1–V21 migration, V15→V21 upgrade, restricted-role RLS, concurrency, scheduling lifecycle, waitlist, outbox, and timezone/DST checks. Frontend 38/38 unit tests, build, lint, 10/10 mocked Chromium browser tests, and one live synthetic-identity browser workflow passed. The local engine was PostgreSQL 18.6; the hosted workflow uses PostgreSQL 16 and must pass on the final commit before M3 development acceptance. See `docs/M3_10_LOCAL_ACCEPTANCE_REPORT.md`. No real patient data was used.

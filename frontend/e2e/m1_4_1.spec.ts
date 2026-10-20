@@ -69,6 +69,14 @@ async function installApiFixtures(page: Page, options: { rejectSignIn?: boolean 
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
     } else if (path === '/api/clinic-management/branches/' + branch.id + '/staff') {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([owner]) })
+    } else if (path.startsWith('/api/scheduling/calendar')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    } else if (path.startsWith('/api/scheduling/queue')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    } else if (path.startsWith('/api/scheduling/resources')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ dentists: [{ id: 'dentist-1', full_name: 'Synthetic Dentist' }], chairs: [{ id: 'chair-1', name: 'Synthetic Chair 1' }] }) })
+    } else if (path.startsWith('/api/scheduling/types')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
     } else {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
     }
