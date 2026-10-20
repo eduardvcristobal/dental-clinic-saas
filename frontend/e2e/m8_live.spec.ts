@@ -42,3 +42,25 @@ test('M8 notifications: disabled provider, tenant policy, consent and recall bou
  const latest=await request.get(api+'/queue',{headers:h(owner)})
  expect((await latest.json() as Array<{recall_id:string;status:string}>).some(x=>x.recall_id===id&&x.status==='SUPPRESSED')).toBe(true)
 })
+
+test('M8.10.23 provider callback and public patient-action endpoints fail closed',async({request})=>{
+ const owner=await token(request,'owner@m25.test')
+ const anonymous=await request.post(backend+'/api/notification-webhooks/resend',{
+  headers:{'Content-Type':'application/json'},
+  data:{type:'email.delivered',data:{email_id:'synthetic_12345678'}}
+ })
+ expect(anonymous.status()).toBe(401)
+ const twilio=await request.post(backend+'/api/notification-webhooks/twilio',{
+  form:{MessageSid:'SM00000000000000000000000000000000',MessageStatus:'delivered'}
+ })
+ expect(twilio.status()).toBe(401)
+ const publicAction=await request.post(backend+'/api/patient-actions/redeem',{
+  data:{clinicId:'44000000-0000-4000-8000-000000000001',token:'A'.repeat(43)}
+ })
+ expect(publicAction.status()).toBe(503)
+ const staffIssue=await request.post(backend+'/api/patient-actions/issue',{
+  headers:h(owner),
+  data:{deliveryId:'44000000-0000-4000-8000-000000000032',action:'CONFIRM'}
+ })
+ expect(staffIssue.status()).toBe(503)
+})
