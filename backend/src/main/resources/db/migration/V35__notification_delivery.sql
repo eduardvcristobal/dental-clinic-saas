@@ -41,6 +41,7 @@ CREATE TABLE notification_delivery(
  FOREIGN KEY(clinic_id,recall_id) REFERENCES recall(clinic_id,id)
 );
 CREATE INDEX notification_ready_idx ON notification_delivery(status,scheduled_for,next_attempt_at);
+CREATE UNIQUE INDEX notification_delivery_clinic_id ON notification_delivery(clinic_id,id);
 CREATE TABLE notification_response(
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),clinic_id UUID NOT NULL,delivery_id UUID NOT NULL,
  response TEXT NOT NULL CHECK(response IN('CONFIRM','CANCEL_REQUEST','RESCHEDULE_REQUEST')),
@@ -48,7 +49,6 @@ CREATE TABLE notification_response(
  UNIQUE(clinic_id,delivery_id),
  FOREIGN KEY(clinic_id,delivery_id) REFERENCES notification_delivery(clinic_id,id)
 );
-CREATE UNIQUE INDEX notification_delivery_clinic_id ON notification_delivery(clinic_id,id);
 DO $$ DECLARE t TEXT; BEGIN
  FOREACH t IN ARRAY ARRAY['notification_policy','notification_consent','notification_delivery','notification_response']
  LOOP
