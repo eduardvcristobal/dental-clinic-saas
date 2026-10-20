@@ -44,6 +44,14 @@ public final class PatientActionController {
   UUID id=tx.execute(s->{
    List<UUID> rows=db.queryForList("SELECT id FROM notification_delivery WHERE clinic_id=? AND id=? AND status IN ('ACCEPTED','DELIVERED') FOR UPDATE",UUID.class,p.clinicId(),in.deliveryId());
    if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Eligible delivery not found");
+   // Serialize issuance against the delivery row and cap active links per delivery.
+   // A staff account must not be able to mint an unlimited number of bearer tokens.
+   Integer active=db.queryForObject("""
+     SELECT count(*) FROM notification_patient_action
+     WHERE clinic_id=? AND delivery_id=? AND consumed_at IS NULL AND expires_at>now()
+     """,Integer.class,p.clinicId(),in.deliveryId());
+   if(active!=null&&active>=5)
+     throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Too many active patient links");
    UUID actionId=UUID.randomUUID();
    db.update("INSERT INTO notification_patient_action(id,clinic_id,delivery_id,token_hash,expires_at,requested_action) VALUES(?,?,?,?,?,?)",
      actionId,p.clinicId(),in.deliveryId(),hash,Timestamp.from(Instant.now().plus(Duration.ofHours(24))),in.action());
