@@ -98,7 +98,7 @@ public class SchedulingController {
         return db.queryForMap("SELECT id,name,default_minutes,buffer_before_minutes,buffer_after_minutes,color,active FROM appointment_type WHERE id=? AND clinic_id=?",id,c);
     }
     @GetMapping("/policy") @Transactional(readOnly=true)
-    public Map<String,Object> policy(Authentication a) { UUID c=clinic(a);db.update("INSERT INTO scheduling_policy(clinic_id) VALUES(?) ON CONFLICT DO NOTHING",c);return db.queryForMap("SELECT slot_minutes,minimum_notice_minutes,booking_horizon_days FROM scheduling_policy WHERE clinic_id=?",c); }
+    public Map<String,Object> policy(Authentication a) { UUID c=clinic(a);List<Map<String,Object>> rows=db.queryForList("SELECT slot_minutes,minimum_notice_minutes,booking_horizon_days FROM scheduling_policy WHERE clinic_id=?",c);return rows.isEmpty()?Map.of("slot_minutes",15,"minimum_notice_minutes",0,"booking_horizon_days",180):rows.get(0); }
     @PutMapping("/policy") @Transactional
     public Map<String,Object> updatePolicy(Authentication a,@RequestBody PolicyInput p) {
         UUID c=manager(a).clinicId();require(p.slotMinutes()!=null&&Set.of(5,10,15,20,30,60).contains(p.slotMinutes()),"Invalid slot minutes");
