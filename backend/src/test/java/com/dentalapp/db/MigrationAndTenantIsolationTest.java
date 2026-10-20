@@ -162,6 +162,42 @@ class MigrationAndTenantIsolationTest {
             try (var rs=s.executeQuery("SELECT count(*) FROM staff_invitation")) {rs.next(); assertThat(rs.getInt(1)).isZero();}
             assertThat(s.executeUpdate("UPDATE staff_invitation SET revoked_at=now() WHERE id='"+invitationA+"'")) .isZero();
         }
+        // M4: clinic-scoped odontogram, immutable events and single-supersession rule.
+        UUID chartA=UUID.randomUUID(), chartB=UUID.randomUUID(), findingA=UUID.randomUUID();
+        try (Connection owner = ownerConnection(); var st = owner.createStatement()) {
+            st.execute("INSERT INTO odontogram_chart(id,clinic_id,patient_id,created_by) VALUES " +
+                "('"+chartA+"','"+clinicA+"','"+patientA+"','"+userA+"'),('"+chartB+"','"+clinicB+"','"+patientB+"','"+userB+"')");
+            st.execute("INSERT INTO odontogram_finding_event(id,clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,recorded_by) VALUES " +
+                "('"+findingA+"','"+clinicA+"','"+chartA+"','"+patientA+"',11,'I','CARIES','OBSERVATION','"+userA+"')");
+            assertThrows(SQLException.class, () -> st.execute(
+                "INSERT INTO odontogram_finding_event(clinic_id,chart_id,patient_id,tooth_number,condition_code,event_kind,recorded_by) VALUES " +
+                "('"+clinicA+"','"+chartA+"','"+patientB+"',11,'CARIES','OBSERVATION','"+userA+"')"));
+            assertThrows(SQLException.class, () -> st.execute(
+                "INSERT INTO odontogram_finding_event(clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,recorded_by) VALUES " +
+                "('"+clinicA+"','"+chartA+"','"+patientA+"',19,'O','CARIES','OBSERVATION','"+userA+"')"));
+        }
+        try (Connection app = appConnection()) {
+            app.setAutoCommit(false);
+            try (var st = app.createStatement()) {
+                st.execute("SELECT set_config('app.clinic_id','"+clinicA+"',false)");
+                try (var rs=st.executeQuery("SELECT count(*) FROM odontogram_chart")) {
+                    rs.next(); assertThat(rs.getInt(1)).isEqualTo(1);
+                }
+                try (var rs=st.executeQuery("SELECT count(*) FROM odontogram_finding_event")) {
+                    rs.next(); assertThat(rs.getInt(1)).isEqualTo(1);
+                }
+                assertSqlRejected(app,st,"INSERT INTO odontogram_chart(clinic_id,patient_id) VALUES ('"+clinicB+"','"+patientB+"')");
+                assertSqlRejected(app,st,"INSERT INTO odontogram_chart(clinic_id,patient_id) VALUES ('"+clinicA+"','"+patientB+"')");
+                assertSqlRejected(app,st,"DELETE FROM odontogram_finding_event WHERE id='"+findingA+"'");
+                assertSqlRejected(app,st,"UPDATE odontogram_finding_event SET notes='forged' WHERE id='"+findingA+"'");
+                UUID correction=UUID.randomUUID();
+                st.execute("INSERT INTO odontogram_finding_event(id,clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,recorded_by,supersedes_event_id) VALUES " +
+                    "('"+correction+"','"+clinicA+"','"+chartA+"','"+patientA+"',11,'I','RESTORATION','CORRECTION','"+userA+"','"+findingA+"')");
+                assertSqlRejected(app,st,"INSERT INTO odontogram_finding_event(clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,recorded_by,supersedes_event_id) VALUES " +
+                    "('"+clinicA+"','"+chartA+"','"+patientA+"',11,'I','CROWN','CORRECTION','"+userA+"','"+findingA+"')");
+            }
+            app.rollback();
+        }
         // Earlier V11's global permission must no longer reveal patient rows.
         try (Connection app = appConnection(); var s = app.createStatement()) {
             s.execute("SELECT set_config('app.platform_admin','true',false)");
