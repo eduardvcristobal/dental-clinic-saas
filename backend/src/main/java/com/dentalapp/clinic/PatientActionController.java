@@ -67,6 +67,10 @@ public final class PatientActionController {
    byte[] hash;
    try{hash=tokens.hash(in.token());}
    catch(IllegalArgumentException ex){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid patient action");}
+   // Rate-limit public redemption by token-independent tenant bucket before any database lookup.
+   // This is an in-process defense-in-depth guard, not a substitute for edge/distributed limits.
+   if(!PatientRedemptionThrottle.allow(in.clinicId(),Instant.now()))
+     throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Too many patient action attempts");
    return TenantContext.callAs(in.clinicId(),()->tx.execute(s->{
     var rows=db.queryForList("""
       SELECT id,delivery_id,requested_action FROM notification_patient_action
