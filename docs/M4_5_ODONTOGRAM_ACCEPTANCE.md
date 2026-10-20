@@ -63,3 +63,31 @@ Status: IMPLEMENTED IN SOURCE; acceptance NOT YET CERTIFIED. Do not merge until 
 
 ## Development decision
 M4.1–M4.4 source functionality has been delivered. M4.5 development acceptance remains OPEN until CI, PostgreSQL and authenticated browser verification pass.
+
+
+## M4.5 hosted certification evidence — 2026-10-20
+
+**Application-code SHA:** `a8ca31103504791d0eceb664558c9b429fffeebc`.
+**GitHub Actions workflow:** [Run 39374343574](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39374343574).
+
+Observed directly in GitHub Actions jobs and raw logs:
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Java 17 Maven | PASS | 79 tests, 0 failed, 0 errors, 12 skipped (67 executed), BUILD SUCCESS |
+| PostgreSQL 16 fresh schema | PASS | Flyway V1–V24 during restricted-role integration |
+| PostgreSQL V21→V24 upgrade | PASS | `OdontogramMigrationUpgradeTest` (1 run; preserved legacy tooth record) |
+| Restricted-role odontogram RLS & constraints | PASS | `MigrationAndTenantIsolationTest` (1 run) with cross-clinic, append-only, supersession assertions |
+| Frontend typecheck, lint, Vitest, build | PASS | 42 unit tests, 0 warnings/errors from lint/build |
+| Standard Playwright Chromium | PASS | 6 browser tests including 2 mocked M4 chart scenarios |
+| Real backend odontogram browser E2E | PASS | 1 end-to-end Chromium scenario, real Spring Boot + disposable PostgreSQL 16, synthetic Google JWKS |
+| Secret scanning | PASS | GitHub Gitleaks job |
+| Dependency Review | UNAVAILABLE | Private repository does not support the GitHub feature; kept as optional via `RUN_DEPENDENCY_REVIEW` flag |
+| OWASP/NVD | DEFERRED | M10 security exception; never mark PASS |
+| Previously environment-gated M3 tests | SKIPPED | 10 scheduling DB and 2 prior upgrade tests; do not imply full M3 validation |
+| Firefox/WebKit M4 E2E | NOT RUN | Chromium only in this workflow |
+| Real patient production use | BLOCKED | Requires full security, privacy, legal/clinical, and operational certification |
+
+Important: one M4 clinical browser test uses a real backend and PostgreSQL but deliberately **synthetic** identities through local JWKS; it does not verify the external Google provider or production use. The existing V4 `tooth_record` remains intact, but there is **no historical backfill** into the M4 event schema. The M3.10 parallel agent's subsequent changes must still be reconciled before merge.
+
+**Development acceptance recommendation:** M4 is **complete for development on the feature branch** based on the M4-specific tested workflows. Final merging remains subject to user approval and synchronizing with the accepted M3 baseline. Production clinical use is not authorized.
