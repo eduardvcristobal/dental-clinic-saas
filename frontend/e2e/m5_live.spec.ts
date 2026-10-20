@@ -54,6 +54,12 @@ test('M5 real-backend clinical workflow: encounter, SOAP, diagnosis, prescriptio
  await page.getByRole('tab',{name:/Visits|Encounters/}).click()
  await expect(page.getByText('Synthetic pain history')).not.toBeVisible()
  await expect(page.getByLabel('Subjective')).toHaveValue('Synthetic pain history')
+ await page.getByRole('button',{name:'Record finding for encounter'}).click()
+ await expect(page.getByText('Tooth 11 — CARIES')).toBeVisible()
+ const linkedChart=await request.get(backend+'/api/odontogram/patients/'+patient,{headers:headers(d.token)})
+ const linkedEvents=(await linkedChart.json()).events as Array<{encounter_visit_id?:string|null}>
+ expect(linkedEvents.some(e=>e.encounter_visit_id===encounter.id)).toBe(true)
+
 
  const sign=await request.post(base+'/signature',{headers:headers(d.token),data:{draftVersion:1}})
  expect(sign.status()).toBe(201)
