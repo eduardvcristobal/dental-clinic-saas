@@ -8,11 +8,11 @@ Branch: `feature/m8-10-provider-delivery-hardening` (base `main`, 2026-10-20).
 - Destination E.164 and email syntax checks, timezone-aware quiet-hour calculation, bounded exponential retry intervals, and JUnit tests for the pure rules and fail-closed default.
 
 ## What is NOT implemented — release blockers
-- **No worker calls the provider adapter.** Existing notification queue remains manual and never externally dispatches. Do not turn on the feature flag.
-- No tenant-safe worker claiming, renewal, crash recovery, backoff persistence, delivery-attempt audit, or idempotent replay semantics.
+- A feature-gated worker now calls the provider adapter for explicitly configured tenant UUIDs; both worker and outbound flags remain disabled by default. **Do not enable either feature flag until all remaining safety gates have passed.**
+- Worker has transactional SKIP LOCKED claiming, lease timeout, bounded backoff and final revalidation, but multi-worker lease fencing, renewal, delivery-attempt audit, and safe Twilio idempotent replay still need verification and hardening.
 - No cryptographically verified Resend/Twilio delivery callback endpoint, deduplication workflow, delivery-state transitions or webhook replay guard.
-- No generated patient links, constant-time hashed token verification, single-use consumption, secure opt-out, or staff-approval booking workflow.
-- No appointment mutation synchronization, final-state and consent checks at dispatch time, clinic-zone quiet-hour enforcement in a real worker.
+- Random patient token generation and constant-time hash comparison utilities exist, but no token issuing/consuming controller, single-use transaction, opt-out endpoint, or staff-approval booking workflow exists.
+- V37 suppresses pending/failed reminders on appointment changes; dispatch revalidates consent, policy and active booking, and postpones messages during clinic-zone quiet hours. **CLAIMED/in-flight invalidation and concurrent appointment edits still need a race-safe send fence.**
 - No rate limiting, per-destination and tenant quotas, credential rotation playbook, provider sandbox integration tests, or production verification.
 - Real provider callbacks and consent handling require privacy/compliance signoff. Keep payloads PHI-minimal; never include diagnosis, treatment or other sensitive details in external messages.
 
@@ -21,6 +21,8 @@ Branch: `feature/m8-10-provider-delivery-hardening` (base `main`, 2026-10-20).
 app:
   notifications:
     outbound-enabled: false
+    worker-enabled: false
+    worker-clinic-ids: ${NOTIFICATION_WORKER_CLINIC_IDS:}
     resend-api-key: ${RESEND_API_KEY:}
     from-email: ${NOTIFICATION_FROM_EMAIL:}
     twilio-account-sid: ${TWILIO_ACCOUNT_SID:}
