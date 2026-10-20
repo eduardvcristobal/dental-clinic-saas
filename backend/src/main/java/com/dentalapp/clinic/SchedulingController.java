@@ -56,14 +56,18 @@ public class SchedulingController {
         String value=db.queryForObject("SELECT timezone FROM clinic WHERE id=?",String.class,clinic);
         return ZoneId.of(value);
     }
-    private static Instant instant(Object value) { return value instanceof Instant i ? i : ((java.util.Date)value).toInstant(); }
+    private static Instant instant(Object value) {
+        if (value instanceof Instant i) return i;
+        if (value instanceof java.time.OffsetDateTime od) return od.toInstant();
+        return ((java.util.Date)value).toInstant();
+    }
     private void validateWindow(Instant from,Instant to) {
         require(from!=null && to!=null && to.isAfter(from) && Duration.between(from,to).toHours()<25,"Invalid time interval");
     }
     private void scopeBooking(UUID clinic,BookingInput b) {
         require(b.patientId()!=null && b.branchId()!=null && b.dentistId()!=null,"Patient, branch and dentist required");
         require(exists("patient",clinic,b.patientId()) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM patient WHERE clinic_id=? AND id=? AND deleted_at IS NULL)",Boolean.class,clinic,b.patientId())),"Active patient not found");
-        require(exists("branch",clinic,b.branchId()) && exists("dentist",clinic,b.dentistId()),"Branch or dentist not found");
+        require(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM branch WHERE clinic_id=? AND id=? AND active)",Boolean.class,clinic,b.branchId())) && Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM dentist WHERE clinic_id=? AND id=? AND active)",Boolean.class,clinic,b.dentistId())),"Branch or dentist unavailable");
         if(b.chairId()!=null) require(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM chair WHERE clinic_id=? AND id=? AND branch_id=? AND active)",Boolean.class,clinic,b.chairId(),b.branchId())),"Chair unavailable in branch");
         if(b.appointmentTypeId()!=null) require(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM appointment_type WHERE clinic_id=? AND id=? AND active)",Boolean.class,clinic,b.appointmentTypeId())),"Appointment type unavailable");
     }
@@ -111,18 +115,29 @@ public class SchedulingController {
     // M3.2 dentist availability
     @GetMapping("/dentist-availability") @Transactional(readOnly=true)
     public List<Map<String,Object>> availability(Authentication a,@RequestParam UUID branchId) {
-        UUID c=clinic(a);return db.queryForList("SELECT id,dentist_id,branch_id,day_of_week,starts_at,ends_at FROM dentist_availability WHERE clinic_id=? AND branch_id=? ORDER BY day_of_week,starts_at",c,branchId);
+        UUID c=clinic(a);require(exists("branch",c,branchId),"Unknown branch");return db.queryForList("SELECT id,dentist_id,branch_id,day_of_week,starts_at,ends_at FROM dentist_availability WHERE clinic_id=? AND branch_id=? ORDER BY day_of_week,starts_at",c,branchId);
     }
     @PostMapping("/dentist-availability") @ResponseStatus(HttpStatus.CREATED) @Transactional
     public Map<String,Object> setAvailability(Authentication a,@RequestBody AvailabilityInput in) {
         UUID c=manager(a).clinicId();require(in.dentistId()!=null&&in.branchId()!=null&&exists("dentist",c,in.dentistId())&&exists("branch",c,in.branchId()),"Unknown dentist or branch");
         require(in.dayOfWeek()!=null&&in.dayOfWeek()>=1&&in.dayOfWeek()<=7&&in.startsAt()!=null&&in.endsAt()!=null&&in.startsAt().isBefore(in.endsAt()),"Invalid availability");
+        // Serialize availability edits per dentist so overlapping hours across branches cannot race.
+        db.queryForObject("SELECT id FROM dentist WHERE clinic_id=? AND id=? FOR UPDATE",UUID.class,c,in.dentistId());
+        require(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM dentist_availability WHERE clinic_id=? AND dentist_id=? AND day_of_week=? AND starts_at<? AND ends_at>?)",Boolean.class,c,in.dentistId(),in.dayOfWeek(),in.endsAt(),in.startsAt())),"Dentist hours overlap an existing branch schedule");
         UUID id=UUID.randomUUID();db.update("INSERT INTO dentist_availability(id,clinic_id,dentist_id,branch_id,day_of_week,starts_at,ends_at) VALUES(?,?,?,?,?,?,?)",id,c,in.dentistId(),in.branchId(),in.dayOfWeek(),in.startsAt(),in.endsAt());
         return db.queryForMap("SELECT * FROM dentist_availability WHERE id=? AND clinic_id=?",id,c);
+    }
+    @DeleteMapping("/dentist-availability/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @Transactional
+    public void removeAvailability(Authentication a,@PathVariable UUID id) {
+        UUID c=manager(a).clinicId();
+        int updated=db.update("DELETE FROM dentist_availability WHERE id=? AND clinic_id=?",id,c);
+        if(updated==0)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Availability not found");
     }
     @PostMapping("/dentist-time-off") @ResponseStatus(HttpStatus.CREATED) @Transactional
     public Map<String,Object> timeOff(Authentication a,@RequestBody BlockInput in) {
         UUID c=manager(a).clinicId();validateWindow(in.startsAt(),in.endsAt());require(in.resourceId()!=null&&exists("dentist",c,in.resourceId()),"Unknown dentist");
+        db.queryForObject("SELECT id FROM dentist WHERE clinic_id=? AND id=? FOR UPDATE",UUID.class,c,in.resourceId());
+        require(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM appointment WHERE clinic_id=? AND dentist_id=? AND starts_at<? AND ends_at>? AND status NOT IN ('CANCELLED','NO_SHOW'))",Boolean.class,c,in.resourceId(),in.endsAt(),in.startsAt())),"Time off conflicts with booked appointments");
         UUID id=UUID.randomUUID();db.update("INSERT INTO dentist_time_off(id,clinic_id,dentist_id,starts_at,ends_at,reason) VALUES(?,?,?,?,?,?)",id,c,in.resourceId(),in.startsAt(),in.endsAt(),in.reason());
         return db.queryForMap("SELECT * FROM dentist_time_off WHERE id=? AND clinic_id=?",id,c);
     }
@@ -130,6 +145,8 @@ public class SchedulingController {
     @PostMapping("/chair-blocks") @ResponseStatus(HttpStatus.CREATED) @Transactional
     public Map<String,Object> chairBlock(Authentication a,@RequestBody BlockInput in) {
         UUID c=manager(a).clinicId();validateWindow(in.startsAt(),in.endsAt());require(in.resourceId()!=null&&exists("chair",c,in.resourceId()),"Unknown chair");
+        db.queryForObject("SELECT id FROM chair WHERE clinic_id=? AND id=? FOR UPDATE",UUID.class,c,in.resourceId());
+        require(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM appointment WHERE clinic_id=? AND chair_id=? AND starts_at<? AND ends_at>? AND status NOT IN ('CANCELLED','NO_SHOW'))",Boolean.class,c,in.resourceId(),in.endsAt(),in.startsAt())),"Chair block conflicts with booked appointments");
         UUID id=UUID.randomUUID();db.update("INSERT INTO chair_block(id,clinic_id,chair_id,starts_at,ends_at,reason) VALUES(?,?,?,?,?,?)",id,c,in.resourceId(),in.startsAt(),in.endsAt(),in.reason());
         return db.queryForMap("SELECT * FROM chair_block WHERE id=? AND clinic_id=?",id,c);
     }
@@ -150,6 +167,9 @@ public class SchedulingController {
         AuthPrincipal p=staff(a);UUID c=p.clinicId();
         // First creation for older clinics lazily establishes defaults (GET /policy is read-only).
         db.update("INSERT INTO scheduling_policy(clinic_id) VALUES(?) ON CONFLICT DO NOTHING",c);
+        // Resource row locks synchronize booking with creation of chair and dentist blocks.
+        db.queryForObject("SELECT id FROM dentist WHERE clinic_id=? AND id=? FOR UPDATE",UUID.class,c,in.dentistId());
+        if(in.chairId()!=null) db.queryForObject("SELECT id FROM chair WHERE clinic_id=? AND id=? FOR UPDATE",UUID.class,c,in.chairId());
         validateSchedule(c,in);UUID id=UUID.randomUUID();
         try { db.update("INSERT INTO appointment(id,clinic_id,branch_id,patient_id,dentist_id,chair_id,appointment_type_id,starts_at,ends_at,status,reason,created_by) VALUES(?,?,?,?,?,?,?,?,?,'BOOKED',?,?)",id,c,in.branchId(),in.patientId(),in.dentistId(),in.chairId(),in.appointmentTypeId(),in.startsAt(),in.endsAt(),in.reason(),p.userId()); }
         catch(DataIntegrityViolationException e) { throw new ResponseStatusException(HttpStatus.CONFLICT,"Slot already booked or resource constraints violated"); }
@@ -178,6 +198,8 @@ public class SchedulingController {
         AuthPrincipal p=staff(a);Map<String,Object> old=appointment(a,id);String status=(String)old.get("status");
         require(Set.of("BOOKED","CONFIRMED").contains(status),"Appointment cannot be rescheduled");
         BookingInput candidate=new BookingInput((UUID)old.get("patient_id"),(UUID)old.get("branch_id"),(UUID)old.get("dentist_id"),(UUID)old.get("chair_id"),(UUID)old.get("appointment_type_id"),input.startsAt(),input.endsAt(),input.reason());
+        db.queryForObject("SELECT id FROM dentist WHERE clinic_id=? AND id=? FOR UPDATE",UUID.class,p.clinicId(),candidate.dentistId());
+        if(candidate.chairId()!=null) db.queryForObject("SELECT id FROM chair WHERE clinic_id=? AND id=? FOR UPDATE",UUID.class,p.clinicId(),candidate.chairId());
         validateSchedule(p.clinicId(),candidate);
         try { int n=db.update("UPDATE appointment SET starts_at=?,ends_at=?,reason=?,updated_at=now(),version=version+1 WHERE id=? AND clinic_id=? AND version=?",input.startsAt(),input.endsAt(),input.reason(),id,p.clinicId(),((Number)old.get("version")).longValue());if(n==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Appointment changed"); }
         catch(DataIntegrityViolationException e){throw new ResponseStatusException(HttpStatus.CONFLICT,"Slot already booked");}
