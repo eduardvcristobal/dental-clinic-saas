@@ -20,7 +20,8 @@ describe('dentition selection',()=>{
   const values=teethFor('mixed')
   expect(values).toHaveLength(52)
   expect(new Set(values).size).toBe(52)
- })\n it('supports appropriate incisal and occlusal choices',()=>{
+ })
+ it('supports appropriate incisal and occlusal choices',()=>{
   expect(surfaceOptions(11)).toContain('I')
   expect(surfaceOptions(11)).not.toContain('O')
   expect(surfaceOptions(16)).toContain('O')
