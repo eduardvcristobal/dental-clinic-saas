@@ -15,6 +15,6 @@ CREATE TABLE dentist_time_off (
 DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['dentist_availability','dentist_time_off'] LOOP
  EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY',t);
  EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY',t);
- EXECUTE format('CREATE POLICY tenant_isolation ON %I USING (clinic_id=nullif(current_setting(''app.clinic_id'',true),)::uuid) WITH CHECK (clinic_id=nullif(current_setting(app.clinic_id,true),)::uuid)',t);
+ EXECUTE format('CREATE POLICY tenant_isolation ON %I USING (clinic_id=nullif(current_setting(''app.clinic_id'',true),'''')::uuid) WITH CHECK (clinic_id=nullif(current_setting(''app.clinic_id'',true),'''')::uuid)',t);
  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='dental_app') THEN EXECUTE format('GRANT SELECT,INSERT,UPDATE,DELETE ON %I TO dental_app',t); END IF;
  END LOOP; END $$;
