@@ -35,7 +35,7 @@ function Patient360({ role }: { role: WorkspaceRole }) {
   const [params,setParams] = useSearchParams()
   const [query,setQuery] = useState('')
   const [rows,setRows] = useState<Patient[]>([])
-  const [patient,setPatient] = useState<Patient|null>(null)
+  const [loaded,setLoaded] = useState<{id:string;patient:Patient}|null>(null)
   const [error,setError] = useState('')
   const [loading,setLoading] = useState(false)
   const [tab,setTab] = useState('overview')
@@ -43,9 +43,7 @@ function Patient360({ role }: { role: WorkspaceRole }) {
   useEffect(() => {
     let live=true
     if(!selectedId)return
-    setError('')
-    setLoading(true)
-    void api<Patient>(`/api/patients/${encodeURIComponent(selectedId)}`).then(p=>{if(live){setPatient(p);setError('')}}).catch(e=>{if(live){setPatient(null);setError(e instanceof Error?e.message:'Patient not available')}}).finally(()=>{if(live)setLoading(false)})
+    void api<Patient>(`/api/patients/${encodeURIComponent(selectedId)}`).then(p=>{if(live){setLoaded({id:selectedId,patient:p})}}).catch(e=>{if(live){setLoaded(null);setError(e instanceof Error?e.message:'Patient not available')}})
     return ()=>{live=false}
   },[selectedId])
   useEffect(()=>{
@@ -60,15 +58,15 @@ function Patient360({ role }: { role: WorkspaceRole }) {
   const open=(id:string)=>{setTab('overview');setParams({patient:id})}
   return <>
     <div className="ws-heading"><div><span className="ws-eyebrow">Clinical / Patient 360° · M2.3</span><h1>Patient 360°</h1><p>Verified clinic patient identities and their recorded care foundation. Future workflows remain unavailable.</p></div></div>
-    {error&&<p role="alert" className="ws-global-warning">{error}</p>}
+    {error&&(!selectedId||loaded?.id===selectedId)&&<p role="alert" className="ws-global-warning">{error}</p>}
     {!selectedId&&<div className="ws-panel ws-management"><h3>Select a patient</h3><label>Search clinic registry<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Name, chart number or phone"/></label>{loading&&<p>Loading patient records…</p>}<div className="ws-directory">{rows.map(p=><button key={p.id} onClick={()=>open(p.id)}><b>{p.first_name} {p.last_name}</b><small>{p.chart_no}</small></button>)}</div><p className="ws-subtle">Only patients belonging to your authenticated clinic can be opened. No fictional patient is selected automatically.</p></div>}
-    {selectedId&&<><button onClick={()=>{setParams({});setPatient(null)}}>← Return to patient search</button>{loading&&<p>Loading patient…</p>}{patient&&patient.id===selectedId&&<>
+    {selectedId&&<><button onClick={()=>{setParams({});setLoaded(null)}}>← Return to patient search</button>{loaded?.id===selectedId&&(()=>{const patient=loaded.patient;return <>
       <div className="ws-panel ws-patient-head"><div className="ws-avatar">{patient.first_name.slice(0,1)}{patient.last_name.slice(0,1)}</div><div><h2>{patient.first_name} {patient.last_name}</h2><p>{patient.chart_no} · Date of birth: {patient.birth_date??'Not recorded'} · {patient.phone??'No phone listed'}</p></div><span className="ws-demo-chip">CLINIC RECORD · TEST DATA ONLY</span></div>
       <div className="ws-tabs" role="tablist" aria-label="Patient sections">{[['overview','Overview'],['care','History, guardians & consent'],['chart','Odontogram'],['visits','Visits & SOAP'],['plans','Treatment plans'],['billing','Billing']].map(([id,label])=><button key={id} role="tab" aria-selected={tab===id} className={tab===id?'selected':''} onClick={()=>setTab(id)}>{label}</button>)}</div>
       {tab==='overview'&&<div className="ws-panel ws-management"><h3>Patient details</h3><div className="ws-info-grid"><div><small>Name</small><strong>{patient.first_name} {patient.last_name}</strong></div><div><small>Chart number</small><strong>{patient.chart_no}</strong></div><div><small>Birth date</small><strong>{patient.birth_date??'Not recorded'}</strong></div><div><small>Contact</small><strong>{patient.phone??'Not recorded'}</strong></div><div><small>Email</small><strong>{patient.email??'Not recorded'}</strong></div></div><p>Medical history and consent records are available under History, guardians & consent, subject to your access level.</p><NavLink to="/workspace/patients">Edit demographics in Patient Registry →</NavLink></div>}
       {tab==='care'&&<PatientCare key={patient.id} patient={patient} role={role}/>}
       {['chart','visits','plans','billing'].includes(tab)&&<ComingSoon title={{chart:'Odontogram',visits:'Visits and clinical notes',plans:'Treatment plans',billing:'Patient billing'}[tab]??'Clinical workflow'} description="This feature is not yet connected to this patient's clinical record. No sample findings, SOAP notes, invoices or payments are shown as though they belong to the patient."/>}
-    </>}</>}
+    </>})()}</>}
   </>
 }
 function CalendarPreview(){const [view,setView]=useState('Day');return <><div className="ws-heading"><div><span className="ws-eyebrow">Workspace / Scheduling</span><h1>Appointment Calendar <DemoPill/></h1><p>Scheduling preview by dentist and chair</p></div><div className="ws-toggle">{['Day','Week','Chair'].map(v=><button className={v===view?'active':''} key={v} onClick={()=>setView(v)}>{v}</button>)}</div></div><div className="ws-panel ws-preview-caption">{view} view · Demonstration appointments only. Dragging, booking and rescheduling are not enabled.</div><Schedule/></>}
