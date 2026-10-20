@@ -32,9 +32,11 @@ class EncounterSignatureSecurityTest {
   verifyNoInteractions(db);
  }
  @Test void crossClinicVisitIsNotVisible(){
-  UUID id=UUID.randomUUID();
-  when(db.queryForList(contains("FROM visit WHERE clinic_id=? AND id=?"),any(),eq(id))).thenReturn(List.of());
-  assertThrows(ResponseStatusException.class,()->controller.signed(as("DENTIST"),id));
-  verify(db).queryForList(contains("clinic_id=? AND id=?"),any(),eq(id));
+  UUID id=UUID.randomUUID(),clinic=UUID.randomUUID();
+  var authentication=new UsernamePasswordAuthenticationToken(
+    new AuthPrincipal(UUID.randomUUID(),clinic,"DENTIST"),null);
+  when(db.queryForList(anyString(),eq(clinic),eq(id))).thenReturn(List.of());
+  assertThrows(ResponseStatusException.class,()->controller.signed(authentication,id));
+  verify(db).queryForList(contains("clinic_id=? AND id=?"),eq(clinic),eq(id));
  }
 }
