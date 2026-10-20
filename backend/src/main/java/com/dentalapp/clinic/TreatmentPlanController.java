@@ -4,6 +4,7 @@ import com.dentalapp.auth.AuthPrincipal;
 import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -17,6 +18,7 @@ public class TreatmentPlanController {
  private final JdbcTemplate db;
  public TreatmentPlanController(JdbcTemplate db){this.db=db;}
  public record PlanInput(UUID patientId,UUID dentistId,String title){}
+ public record CatalogInput(String code,String name,String category,BigDecimal defaultPrice,Boolean requiresTooth,Boolean requiresSurface){}
  public record ItemInput(UUID procedureId,Integer toothNumber,String surface,Integer phase,Integer quantity,BigDecimal unitPrice,BigDecimal discount){}
  public record TransitionInput(String status,Long expectedVersion,String consentReference){}
  public record ProgressInput(String status,UUID visitId){}
@@ -34,6 +36,37 @@ public class TreatmentPlanController {
  private void event(AuthPrincipal a,UUID plan,Object patient,String kind,String details){
   db.update("INSERT INTO treatment_plan_event(clinic_id,plan_id,patient_id,actor_id,event_type,details) VALUES(?,?,?,?,?,?)",
    a.clinicId(),plan,patient,a.userId(),kind,details);
+ }
+ private AuthPrincipal manager(Authentication a){
+  AuthPrincipal p=clinician(a);
+  if(!Set.of("OWNER","ADMIN").contains(p.role())) throw new AccessDeniedException("Procedure catalog administration requires clinic manager");
+  return p;
+ }
+ @PostMapping("/catalog") @ResponseStatus(HttpStatus.CREATED) @Transactional
+ public Map<String,Object> addProcedure(Authentication a,@RequestBody CatalogInput in){
+  AuthPrincipal p=manager(a);
+  require(in!=null&&in.code()!=null&&!in.code().isBlank()&&in.code().length()<=80&&
+   in.name()!=null&&!in.name().isBlank()&&in.name().length()<=255&&
+   in.defaultPrice()!=null&&in.defaultPrice().signum()>=0&&in.defaultPrice().scale()<=2&&
+   in.defaultPrice().compareTo(new BigDecimal("9999999999.99"))<=0,"Invalid procedure");
+  UUID id=UUID.randomUUID();
+  try{
+   db.update("INSERT INTO procedure_catalog(id,clinic_id,code,name,category,default_price,requires_tooth,requires_surface) "+
+    "VALUES(?,?,?,?,?,?,?,?)",id,p.clinicId(),in.code().trim(),in.name().trim(),in.category(),
+    in.defaultPrice(),Boolean.TRUE.equals(in.requiresTooth()),Boolean.TRUE.equals(in.requiresSurface()));
+  }catch(DataIntegrityViolationException err){
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Procedure code already in use");
+  }
+  return db.queryForMap("SELECT id,code,name,category,default_price,requires_tooth,requires_surface,active "+
+   "FROM procedure_catalog WHERE clinic_id=? AND id=?",p.clinicId(),id);
+ }
+ @PostMapping("/catalog/{procedureId}/deactivate") @Transactional
+ public Map<String,Object> deactivateProcedure(Authentication a,@PathVariable UUID procedureId){
+  AuthPrincipal p=manager(a);
+  int updated=db.update("UPDATE procedure_catalog SET active=false,updated_at=now(),version=version+1 "+
+   "WHERE clinic_id=? AND id=? AND active=true",p.clinicId(),procedureId);
+  if(updated!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Active procedure not found");
+  return db.queryForMap("SELECT id,code,name,active FROM procedure_catalog WHERE clinic_id=? AND id=?",p.clinicId(),procedureId);
  }
  @GetMapping("/dentists") @Transactional(readOnly=true)
  public List<Map<String,Object>> dentists(Authentication a){
@@ -119,6 +152,10 @@ public class TreatmentPlanController {
   var record=plan(p.clinicId(),id,true);String previous=(String)record.get("status");
   Map<String,String> allowed=Map.of("DRAFT","PROPOSED","PROPOSED","ACCEPTED,DECLINED","ACCEPTED","IN_PROGRESS","IN_PROGRESS","COMPLETED");
   require(Arrays.asList(allowed.getOrDefault(previous,"").split(",")).contains(in.status()),"Invalid status transition");
+  if("PROPOSED".equals(in.status()) && !Boolean.TRUE.equals(db.queryForObject(
+   "SELECT EXISTS(SELECT 1 FROM treatment_plan_item WHERE clinic_id=? AND plan_id=?)",
+   Boolean.class,p.clinicId(),id)))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"A treatment plan must contain at least one procedure");
   if("ACCEPTED".equals(in.status()))require(in.consentReference()!=null&&in.consentReference().trim().length()>=3&&
    in.consentReference().length()<=256,"Patient consent evidence reference required");
   if("COMPLETED".equals(in.status())&&Boolean.TRUE.equals(db.queryForObject(
