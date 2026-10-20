@@ -176,4 +176,32 @@ public class BillingController {
   return installments(a,id);
  }
 
+ @GetMapping("/invoices/{id}/payments") @Transactional(readOnly=true)
+ public List<Map<String,Object>> paymentHistory(Authentication a,@PathVariable UUID id){
+  AuthPrincipal p=cashier(a);invoice(p.clinicId(),id,false);
+  return db.queryForList("SELECT id,amount,method,reference,paid_at,voided_at,void_reason FROM payment "+
+   "WHERE clinic_id=? AND invoice_id=? ORDER BY paid_at,id",p.clinicId(),id);
+ }
+ @GetMapping("/invoices/{id}/receipts/{paymentId}") @Transactional(readOnly=true)
+ public Map<String,Object> receipt(Authentication a,@PathVariable UUID id,@PathVariable UUID paymentId){
+  AuthPrincipal p=cashier(a);var bill=invoice(p.clinicId(),id,false);
+  var rows=db.queryForList("SELECT id,amount,method,reference,paid_at,voided_at FROM payment WHERE clinic_id=? AND invoice_id=? AND id=?",
+   p.clinicId(),id,paymentId);
+  if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Payment not found");
+  var out=new LinkedHashMap<String,Object>(rows.get(0));
+  out.put("invoiceNo",bill.get("invoice_no"));out.put("currency",bill.get("currency_code"));
+  out.put("patientId",bill.get("patient_id"));out.put("receiptStatus",out.get("voided_at")==null?"VALID":"VOID");
+  out.put("notice","Payment acknowledgment only. Not an official tax invoice or receipt.");
+  return out;
+ }
+ @GetMapping("/patients/{patientId}/statement") @Transactional(readOnly=true)
+ public List<Map<String,Object>> statement(Authentication a,@PathVariable UUID patientId){
+  AuthPrincipal p=cashier(a);if(!exists("patient",p.clinicId(),patientId))
+   throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Patient not found");
+  return db.queryForList("SELECT i.id,i.invoice_no,i.currency_code,i.status,i.total,"+
+   "coalesce((SELECT sum(pay.amount) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS paid,"+
+   "i.total-coalesce((SELECT sum(pay.amount) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS balance "+
+   "FROM invoice i WHERE i.clinic_id=? AND i.patient_id=? ORDER BY i.created_at DESC LIMIT 200",p.clinicId(),patientId);
+ }
+
 }
