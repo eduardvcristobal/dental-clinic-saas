@@ -1,6 +1,6 @@
 ## Current milestone snapshot
 
-M1, M2 and M3 are complete for development. M3.10 local acceptance and hosted run `39388194937` passed on application SHA `244ee17`. M4 has not started. Production certification and real-patient use remain open under M10, including the tracked dependency findings.
+M1–M6 were integrated into main and development acceptance was recorded. M7.1–M7.9 have been implemented on a separate feature branch with documented financial closure gaps. Production certification and real-patient/real-money use remain blocked by the security and financial completion gates.
 
 # Dental Clinic SaaS — Project Status
 
@@ -474,3 +474,20 @@ The M4 feature branch passed hosted CI on application-code commit `a8ca311`, [Gi
 **Gates:** OWASP/NVD deferred to M10, 12 unrelated tests skipped; Firefox/WebKit, production Google and compliance validation not run. Consent reference is not a verified patient e-signature. Actual scheduling and invoice workflows remain future work. PR #3 targets M5 and must not merge until M3/M4/M5 are accepted, a final sync/retest passes, and the owner explicitly authorizes the merge.
 
 See `docs/M6_TREATMENT_PLANNING_ACCEPTANCE.md`.
+
+
+## M7 — Billing & Collections (2026-10-20)
+
+**Source:** `feature/m7-billing-collections` stacked on accepted M6 `main`; remains development-only until approval. Uses V5 domain + V32 additive migration.
+
+- [x] M7.1 — V32 ledger constraints, tenant RLS, traceable billing-event audit and idempotency.
+- [x] M7.2 — Invoice draft, line validation, optimistic issue and currency snapshot.
+- [x] M7.3 — Partial/full payment collection with invoice locking and idempotent retry.
+- [~] M7.4 — Installment schedules are saved, but payment allocations/paid status need reconciliation workflow.
+- [~] M7.5 — Patient statements and payment acknowledgment metadata; official fiscal receipt printing remains outstanding.
+- [~] M7.6 — Manager-only audited payment/invoice void; external refund disbursement and credit notes remain outstanding.
+- [x] M7.7 — Validated completed-clinical-item import, immutable plan prices, no duplicate billed item.
+- [x] M7.8 — Tenant financial metrics and real Patient 360 billing UI for authorized cashier roles.
+- [x] M7.9 — Enabled CI passed on app commit `069fa847`: [hosted run 39420766324](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39420766324). OWASP/NVD remains deferred.
+
+**Clinical and financial production use is NOT certified.** Outstanding features, race/load tests, refund settlement, installment matching, fiscal receipts, tax and audit controls are itemized in `docs/M7_BILLING_ACCEPTANCE.md`.
