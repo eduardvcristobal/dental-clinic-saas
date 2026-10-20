@@ -79,6 +79,19 @@ class MigrationAndTenantIsolationTest {
             WHERE proname IN ('suppress_stale_appointment_reminders',
                              'suppress_withdrawn_notification_consent')
             """, Integer.class)).isEqualTo(2);
+        // Verify the actual appointment trigger wiring, not merely that its function exists.
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_trigger t
+            JOIN pg_class c ON c.oid=t.tgrelid
+            WHERE NOT t.tgisinternal AND t.tgname='appointment_reminder_sync'
+              AND c.relname='appointment'
+            """,Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_trigger t
+            JOIN pg_class c ON c.oid=t.tgrelid
+            WHERE NOT t.tgisinternal AND t.tgname='notification_consent_withdrawal_sync'
+              AND c.relname='notification_consent'
+            """,Integer.class)).isEqualTo(1);
         // M3 tables must carry forced tenant RLS and restricted-role grants.
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
