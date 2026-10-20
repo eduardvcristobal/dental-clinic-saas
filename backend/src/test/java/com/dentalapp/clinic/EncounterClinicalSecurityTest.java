@@ -45,9 +45,10 @@ class EncounterClinicalSecurityTest {
   verifyNoInteractions(db);
  }
  @Test void missingEncounterDoesNotLeakOtherClinicData() {
-  UUID id=UUID.randomUUID();
-  when(db.queryForList(contains("FROM visit WHERE clinic_id=? AND id=?"),any(),eq(id))).thenReturn(List.of());
-  assertThrows(ResponseStatusException.class,()->api.soap(auth("DENTIST"),id));
-  verify(db).queryForList(contains("clinic_id=? AND id=?"),any(),eq(id));
+  UUID id=UUID.randomUUID(), clinic=UUID.randomUUID();
+  when(db.queryForList(anyString(),eq(clinic),eq(id))).thenReturn(List.of());
+  assertThrows(ResponseStatusException.class,()->api.soap(
+    new UsernamePasswordAuthenticationToken(new AuthPrincipal(UUID.randomUUID(),clinic,"DENTIST"),null),id));
+  verify(db).queryForList(contains("clinic_id=? AND id=?"),eq(clinic),eq(id));
  }
 }
