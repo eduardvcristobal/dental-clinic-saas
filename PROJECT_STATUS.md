@@ -454,3 +454,20 @@ The M4 feature branch passed hosted CI on application-code commit `a8ca311`, [Gi
 [GitHub Actions 39383121391](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39383121391): Java 101 total (89 executed, 12 gated skips) zero failures; frontend 42 unit tests; 6 standard Chromium + 2 real Spring Boot/PostgreSQL browser tests; security Gitleaks passed. OWASP/NVD deferred and private-repo Dependency Review unavailable. Firefox/WebKit, production Google, external file storage and electronic prescribing remain unverified. Signed-note attestation is NOT a qualified cryptographic signature.
 
 **Merge gate:** M3 acceptance → M4 PR review/merge → reconcile M5 → rerun CI → explicit owner approval. Not production-certified. See `docs/M5_6_CLINICAL_ACCEPTANCE.md`.
+
+
+## M6.1–M6.7 — Dental treatment plans (2026-10-20)
+
+**Status:** Implemented and tested for development on `feature/m6-treatment-planning`; NOT merged into main and NOT production certified. Source depends on stacked M5→M4 and still-unreviewed M3 scheduling baseline.
+
+- [x] M6.1 — Existing V4 procedure catalog reuse, authorized manager catalog additions/deactivation, V30 audit events.
+- [x] M6.2 — Patient 360 treatment builder, clinic-scoped dentist/coded procedure selection, tooth and item validation.
+- [x] M6.3 — BigDecimal estimate, quantity, discount and clinic-specific currency, billing preview without invoice creation.
+- [x] M6.4 — Lifecycle/consent record reference, optimistic status versioning, V31 accepted-price locking and auditable history.
+- [~] M6.5 — Treatment item progress and completed-encounter evidence implemented; actual appointment booking link remains NOT implemented.
+- [~] M6.6 — Odontogram FDI and encounter patient linkage + read-only billing preview; M7 owns actual invoicing/payments.
+- [x] M6.7 — Hosted enabled CI passed for application SHA `e2cfbb1`: [run 39387827145](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39387827145). Java/PG16 106 tests total, 94 executed/12 gated skips, 42 frontend Vitest, six standard Chromium and three real backend clinical browser tests passed; Gitleaks passed.
+
+**Gates:** OWASP/NVD deferred to M10, 12 unrelated tests skipped; Firefox/WebKit, production Google and compliance validation not run. Consent reference is not a verified patient e-signature. Actual scheduling and invoice workflows remain future work. PR #3 targets M5 and must not merge until M3/M4/M5 are accepted, a final sync/retest passes, and the owner explicitly authorizes the merge.
+
+See `docs/M6_TREATMENT_PLANNING_ACCEPTANCE.md`.
