@@ -123,8 +123,6 @@ public class BillingController {
    Set.of("CASH","CARD","BANK_TRANSFER","EWALLET","HMO","OTHER").contains(in.method())&&in.idempotencyKey()!=null,
    "Positive amount, valid payment method and idempotency key required");
   require(in.reference()==null||in.reference().length()<=255,"Reference too long");
-  if(!Set.of("ISSUED","PARTIALLY_PAID").contains(bill.get("status")))
-   throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice is not collectible");
   var previous=db.queryForList("SELECT id,amount,method,reference FROM payment WHERE clinic_id=? AND invoice_id=? AND idempotency_key=?",
    c,id,in.idempotencyKey());
   if(!previous.isEmpty()){
@@ -134,6 +132,8 @@ public class BillingController {
     throw new ResponseStatusException(HttpStatus.CONFLICT,"Idempotency key reused with different payment");
    return balance(a,id);
   }
+  if(!Set.of("ISSUED","PARTIALLY_PAID").contains(bill.get("status")))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice is not collectible");
   BigDecimal paid=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
    BigDecimal.class,c,id);
   BigDecimal total=(BigDecimal)bill.get("total");
