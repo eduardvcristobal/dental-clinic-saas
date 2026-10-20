@@ -27,9 +27,9 @@ export function PatientTreatmentPlans({patientId}:{patientId:string}){
  useEffect(()=>{let alive=true;setPlans([]);setSelected('');setDetail(null);setError('')
   void Promise.all([api<Plan[]>(`/api/treatment-plans/patients/${encodeURIComponent(patientId)}`),
    api<Procedure[]>('/api/treatment-plans/catalog'),
-   api<{dentists:Dentist[]}>('/api/scheduling/resources'),
+   api<Dentist[]>('/api/treatment-plans/dentists'),
    api<Encounter[]>(`/api/encounters/patients/${encodeURIComponent(patientId)}`)]).then(([p,c,r,e])=>{
-    if(alive){setPlans(p);setSelected(p[0]?.id??'');setCatalog(c);setDentists(Array.isArray(r?.dentists)?r.dentists:[]);setEncounters(e)}
+    if(alive){setPlans(p);setSelected(p[0]?.id??'');setCatalog(c);setDentists(Array.isArray(r)?r:[]);setEncounters(e)}
    }).catch(e=>{if(alive)setError(String(e))});return()=>{alive=false}
  },[patientId])
  useEffect(()=>{let alive=true;setDetail(null);setEvents([])
