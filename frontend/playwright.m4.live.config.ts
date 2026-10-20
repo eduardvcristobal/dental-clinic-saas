@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir:'./e2e',
-  testMatch:['m4_live.spec.ts','m5_live.spec.ts'],
+  testMatch:['m4_live.spec.ts','m5_live.spec.ts','m6_live.spec.ts'],
   fullyParallel:false,
   workers:1,
   timeout:120_000,
