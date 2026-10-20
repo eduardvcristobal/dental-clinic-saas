@@ -17,16 +17,18 @@ public final class NotificationDeliveryWorker {
  private final TransactionTemplate tx;
  private final ProviderNotificationTransport provider;
  private final boolean enabled;
+ private final String clinicIds;
  public NotificationDeliveryWorker(JdbcTemplate db,org.springframework.transaction.PlatformTransactionManager manager,
-  ProviderNotificationTransport provider,@Value("${app.notifications.worker-enabled:false}") boolean enabled) {
-  this.db=db;this.tx=new TransactionTemplate(manager);this.provider=provider;this.enabled=enabled;
+  ProviderNotificationTransport provider,@Value("${app.notifications.worker-enabled:false}") boolean enabled,
+  @Value("${app.notifications.worker-clinic-ids:}") String clinicIds) {
+  this.db=db;this.tx=new TransactionTemplate(manager);this.provider=provider;this.enabled=enabled;this.clinicIds=clinicIds;
  }
  @Scheduled(fixedDelayString="${app.notifications.worker-delay-ms:60000}")
  public void poll(){
   if(!enabled)return;
   // Clinic IDs are selected solely from the public clinic registry; every notification read/write
   // happens inside the tenant context and a fresh JDBC transaction.
-  List<UUID> clinics=db.queryForList("SELECT id FROM clinic ORDER BY id LIMIT 1000",UUID.class);
+  List<UUID> clinics=Arrays.stream(clinicIds.split(",")).map(String::trim).filter(s->!s.isEmpty()).map(UUID::fromString).distinct().limit(1000).toList();
   for(UUID clinic:clinics)TenantContext.runAs(clinic,()->{for(int i=0;i<10;i++)if(!dispatchOne(clinic))break;});
  }
  boolean dispatchOne(UUID clinic){
