@@ -206,5 +206,29 @@ public class SchedulingController {
     public List<Map<String,Object>> waitlistEntries(Authentication a,@RequestParam UUID branchId) {
         return db.queryForList("SELECT id,patient_id,branch_id,appointment_type_id,preferred_after,preferred_before,status,offered_until FROM appointment_waitlist WHERE clinic_id=? AND branch_id=? AND status IN ('WAITING','OFFERED') ORDER BY created_at LIMIT 100",clinic(a),branchId);
     }
+    @PostMapping("/waitlist/{id}/cancel") @Transactional
+    public Map<String,Object> cancelWaitlist(Authentication a,@PathVariable UUID id) {
+        UUID c=staff(a).clinicId();
+        int changed=db.update("UPDATE appointment_waitlist SET status='CANCELLED' WHERE clinic_id=? AND id=? AND status IN ('WAITING','OFFERED')",c,id);
+        if(changed==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Waitlist entry missing or already finalized");
+        return db.queryForMap("SELECT id,patient_id,branch_id,status FROM appointment_waitlist WHERE clinic_id=? AND id=?",c,id);
+    }
+    @PostMapping("/waitlist/{id}/offer") @Transactional
+    public Map<String,Object> offerWaitlist(Authentication a,@PathVariable UUID id,@RequestParam(defaultValue="60") int minutes) {
+        UUID c=staff(a).clinicId();require(minutes>=5&&minutes<=1440,"Invalid offer lifetime");
+        int changed=db.update("UPDATE appointment_waitlist SET status='OFFERED',offered_until=now()+(? * interval '1 minute') WHERE clinic_id=? AND id=? AND status='WAITING'",minutes,c,id);
+        if(changed==0)throw new ResponseStatusException(HttpStatus.CONFLICT,"Waitlist entry unavailable");
+        return db.queryForMap("SELECT id,patient_id,branch_id,status,offered_until FROM appointment_waitlist WHERE clinic_id=? AND id=?",c,id);
+    }
+    @PostMapping("/waitlist/expire-offers") @Transactional
+    public Map<String,Object> expireOffers(Authentication a) {
+        UUID c=manager(a).clinicId();
+        int expired=db.update("UPDATE appointment_waitlist SET status='EXPIRED' WHERE clinic_id=? AND status='OFFERED' AND offered_until<now()",c);
+        return Map.of("expired",expired);
+    }
+    @GetMapping("/appointment-notifications") @Transactional(readOnly=true)
+    public List<Map<String,Object>> pendingNotifications(Authentication a) {
+        manager(a);return db.queryForList("SELECT id,appointment_id,event_type,state,created_at FROM appointment_notification_outbox WHERE clinic_id=? ORDER BY created_at DESC LIMIT 100",clinic(a));
+    }
     // M3.9 delivery is deferred to M8; outbox is internal and never directly sends messages.
 }
