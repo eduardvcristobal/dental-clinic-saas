@@ -90,6 +90,23 @@ public class NotificationController {
   UUID id=UUID.randomUUID();db.update("INSERT INTO recall(id,clinic_id,patient_id,due_date,reason) VALUES(?,?,?,?,?)",id,p.clinicId(),in.patientId(),in.dueDate(),in.reason().trim());
   return Map.of("id",id,"patientId",in.patientId(),"dueDate",in.dueDate());
  }
+ @PostMapping("/recalls/{recallId}/schedule") @Transactional
+ public Map<String,Object> scheduleRecall(Authentication a,@PathVariable UUID recallId,@RequestParam String channel){
+  var p=staff(a);check(Set.of("EMAIL","SMS").contains(channel),"Channel required");
+  var rows=db.queryForList("SELECT patient_id,due_date,completed FROM recall WHERE clinic_id=? AND id=? FOR UPDATE",p.clinicId(),recallId);
+  if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Recall not found");
+  var row=rows.get(0);check(!Boolean.TRUE.equals(row.get("completed")),"Recall completed");
+  UUID patient=(UUID)row.get("patient_id");
+  boolean optIn=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM notification_consent WHERE clinic_id=? AND patient_id=? AND channel=? AND consented)",Boolean.class,p.clinicId(),patient,channel));
+  boolean enabled=Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM notification_policy WHERE clinic_id=? AND enabled AND "+(channel.equals("EMAIL")?"email_enabled":"sms_enabled")+")",Boolean.class,p.clinicId()));
+  check(optIn&&enabled,"Consent and active clinic policy required");
+  Instant due=((java.sql.Date)row.get("due_date")).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant();
+  check(due.isAfter(Instant.now()),"Recall due date must be in the future");
+  db.update("INSERT INTO notification_delivery(clinic_id,patient_id,recall_id,channel,category,scheduled_for) VALUES(?,?,?,?,'RECALL',?) "+
+   "ON CONFLICT(clinic_id,recall_id,channel,category) DO UPDATE SET scheduled_for=excluded.scheduled_for,status='PENDING' WHERE notification_delivery.status IN('PENDING','FAILED','SUPPRESSED')",
+   p.clinicId(),patient,recallId,channel,java.sql.Timestamp.from(due));
+  return Map.of("recallId",recallId,"channel",channel,"scheduledFor",due,"deliveryMode","DISABLED_PENDING_PROVIDER");
+ }
  @GetMapping("/recalls") @Transactional(readOnly=true)
  public List<Map<String,Object>> recalls(Authentication a){
   var p=staff(a);return db.queryForList("SELECT id,patient_id,due_date,completed FROM recall WHERE clinic_id=? AND NOT completed ORDER BY due_date,id LIMIT 200",p.clinicId());
