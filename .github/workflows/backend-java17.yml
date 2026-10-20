@@ -30,7 +30,7 @@ jobs:
         env:
           PGPASSWORD: ci-owner-password
         run: |
-          for database in dental_m04_migration dental_m25_upgrade dental_m310_upgrade dental_m310_scheduling; do
+          for database in dental_m04_migration dental_m25_upgrade dental_m310_upgrade dental_m310_scheduling dental_m4_upgrade; do
             createdb -h localhost -U postgres "$database"
           done
       - name: Run backend unit and PostgreSQL integration tests on JDK 17
@@ -52,6 +52,9 @@ jobs:
           M04_MIGRATION_TEST_OWNER_USER: postgres
           M04_MIGRATION_TEST_OWNER_PASSWORD: ci-owner-password
           M04_MIGRATION_TEST_APP_PASSWORD: ci-app-password
+          M4_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m4_upgrade
+          M4_UPGRADE_TEST_DB_USER: postgres
+          M4_UPGRADE_TEST_DB_PASSWORD: ci-owner-password
           M25_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m25_upgrade
           M25_UPGRADE_TEST_DB_PASSWORD: ci-owner-password
           M310_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m310_upgrade
@@ -121,7 +124,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/dependency-review-action@v4
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && vars.RUN_DEPENDENCY_REVIEW == 'true'
 
   # Long: downloads the NVD catalog. Runs only when an NVD_API_KEY repository secret is configured,
   # because anonymously throttled NVD downloads routinely exceed the job time limit.
@@ -157,3 +160,54 @@ jobs:
           name: owasp-report
           path: backend/target/dependency-check-report.html
           retention-days: 14
+
+  # Authenticated real-backend odontogram regression with disposable PostgreSQL and
+  # local synthetic Google JWKS. No real accounts, patient data or provider credentials.
+  m4-clinical-browser:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: dental
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-owner-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dental"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build Spring Boot
+        working-directory: backend
+        run: mvn -B -ntp package -DskipTests
+      - name: Real-backend synthetic M4 browser regression
+        run: bash scripts/m4_live_e2e.sh
+        env:
+          M4_PG_PASSWORD: ci-owner-password
+          M4_APP_PASSWORD: ci-app-password
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: m4-clinical-browser-debug
+          path: frontend/test-results-m4-live
+          retention-days: 7

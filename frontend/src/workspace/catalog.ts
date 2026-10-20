@@ -11,7 +11,7 @@ export const WORKSPACE_MODULES: WorkspaceModule[] = [
   { id: 'patients', title: 'Patients', group: 'Workspace', description: 'Patient registration, demographic records and search', state: 'active', roles: ALL },
   { id: 'check-in', title: 'Check-in', group: 'Workspace', description: 'Arrival check-in and queue', state: 'active', roles: ALL },
   { id: 'patient-360', title: 'Patient 360°', group: 'Clinical', description: 'Unified dental patient record', state: 'preview', roles: ALL },
-  { id: 'odontogram', title: 'Odontogram', group: 'Clinical', description: 'Tooth and surface history', state: 'coming-soon', roles: CLINICAL },
+  { id: 'odontogram', title: 'Odontogram', group: 'Clinical', description: 'Patient-linked tooth and surface history', state: 'active', roles: CLINICAL },
   { id: 'encounters', title: 'Encounters & SOAP', group: 'Clinical', description: 'Signed clinical visits and notes', state: 'coming-soon', roles: CLINICAL },
   { id: 'treatment-plans', title: 'Treatment Plans', group: 'Clinical', description: 'Proposed and accepted treatment', state: 'coming-soon', roles: CLINICAL },
   { id: 'imaging', title: 'Imaging & Files', group: 'Clinical', description: 'Radiographs and clinical attachments', state: 'coming-soon', roles: CLINICAL },

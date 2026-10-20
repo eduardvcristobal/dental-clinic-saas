@@ -414,3 +414,22 @@ Reports: `docs/M2_5_FINAL_ACCEPTANCE_REPORT.md`, `docs/M2_5_BACKEND_REGRESSION.m
 ## M3.10 — Local scheduling acceptance (2026-10-20)
 
 **Status: COMPLETE FOR DEVELOPMENT on application SHA `244ee17`.** Java 17 Maven `clean verify` passed 70/70 tests with no skips against fresh disposable PostgreSQL databases. This includes V1–V21 migration, V15→V21 upgrade, restricted-role RLS, concurrency, scheduling lifecycle, waitlist, outbox, and timezone/DST checks. Frontend 38/38 unit tests, build, lint, 10/10 mocked Chromium browser tests, and one live synthetic-identity browser workflow passed. Hosted run [39388194937](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39388194937) passed Java 17/PostgreSQL 16, frontend, browser and security; optional OWASP was skipped. See `docs/M3_10_ACCEPTANCE_REPORT.md`. No real patient data was used.
+
+## M4 — Odontogram & Dental Charting (2026-10-20; feature branch)
+
+**Current state: implemented in source; NOT certified or approved for clinical production.** Branch `feature/m4-odontogram` is independent of `main` and M3.10 agent changes. The historical snapshot at the top of this file refers to the earlier main baseline and must be reconciled before final merge.
+
+- [x] M4.1: V22 clinic-scoped odontogram schema, FDI tooth notation and append-only provenance; Java validator and test cases added.
+- [x] M4.2: Interactive adult, primary and mixed dentition in Patient 360, selected-patient API integration, surface choices and frontend unit-test cases added.
+- [x] M4.3: Authenticated chart read/observation/correction/retraction API with patient-scoped history.
+- [x] M4.4: V23 unique event supersession, V24 SQL correction provenance, role gates and security regression test cases.
+- [ ] M4.5: Full Java 17, PostgreSQL 16 migrations/RLS, browser E2E, CI and pre-merge verification — NOT RUN in this authoring environment; require actual evidence.
+
+Changes are limited to the M4 branch. Do not interpret an unrun test as passed, do not merge automatically, and do not enable real patient data. See `docs/M4_5_ODONTOGRAM_ACCEPTANCE.md`.
+
+
+### M4.5 validation closure — 2026-10-20
+
+The M4 feature branch passed hosted CI on application-code commit `a8ca311`, [GitHub Actions run 39374343574](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39374343574): Java 17/Maven 79 tests (67 executed, 12 environment-gated skips), fresh PostgreSQL 16 V1–V24 migration and V21→V24 legacy preservation, restricted-role RLS and clinical history integrity, frontend 42 Vitest tests with typecheck/lint/build, 6 mocked Chromium Playwright tests and 1 real Spring Boot/PostgreSQL odontogram E2E using synthetic local Google JWKS. Gitleaks passed. Detailed job evidence: `docs/M4_5_ODONTOGRAM_ACCEPTANCE.md`.
+
+**M4 development readiness:** COMPLETE FOR DEVELOPMENT **on feature branch**, pending independent PR review, M3.10 baseline reconciliation and explicit owner approval before merging. No real patient data or clinical production use. Maven OWASP/NVD remains DEFERRED to M10, private-repo Dependency Review is unavailable, 12 unrelated environment-gated backend tests remain skipped, Firefox/WebKit clinical browser tests are not yet run. The legacy V4 tooth records are retained but not backfilled to M4 history.
