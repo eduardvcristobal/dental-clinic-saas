@@ -30,7 +30,7 @@ JWKS_PID=$!
 export DB_URL="jdbc:postgresql://$PGHOST:$PGPORT/$DB_NAME"
 export DB_OWNER_USER="$PGUSER" DB_OWNER_PASSWORD="$OWNER_PASSWORD" DB_APP_USER=dental_app DB_APP_PASSWORD="$APP_PASSWORD"
 export GOOGLE_CLIENT_ID='m25-live-test-client' GOOGLE_JWK_SET_URI="http://127.0.0.1:$JWKS_PORT/keys"
-export APP_JWT_SECRET='m4-synthetic-jwt-secret-at-least-32-characters' APP_COOKIE_SECURE=false
+export APP_JWT_SECRET="$(openssl rand -hex 32)" APP_COOKIE_SECURE=false
 export APP_ALLOWED_ORIGINS="http://127.0.0.1:$FRONTEND_PORT" SERVER_PORT="$BACKEND_PORT"
 export LOGGING_LEVEL_ROOT=WARN
 java -jar "$ROOT/backend/target/dental-backend-0.1.0.jar" --logging.level.root=WARN >"$BACKEND_LOG" 2>&1 &
