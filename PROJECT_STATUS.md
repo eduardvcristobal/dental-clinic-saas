@@ -491,3 +491,18 @@ See `docs/M6_TREATMENT_PLANNING_ACCEPTANCE.md`.
 - [x] M7.9 — Enabled CI passed on app commit `069fa847`: [hosted run 39420766324](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39420766324). OWASP/NVD remains deferred.
 
 **Clinical and financial production use is NOT certified.** Outstanding features, race/load tests, refund settlement, installment matching, fiscal receipts, tax and audit controls are itemized in `docs/M7_BILLING_ACCEPTANCE.md`.
+
+
+## M7 Financial Closure Follow-up — 2026-10-20
+
+**Branch:** `feature/m7-financial-closure`; separate draft PR based on merged M7. Production or legally issued invoices/receipts remain BLOCKED pending regulatory verification.
+
+- [x] M7.10 — V33 append-only tenant-scoped manual refund evidence, idempotency, net received balance/status integration and patient billing UI
+- [x] M7.11 — Read-only FIFO installment allocation, as-of overdue view, refund-aware clinic collections; timezone-specific daily closeout and persistent allocation provenance not complete
+- [x] M7.12 — V34 manager-configurable fiscal readiness profile with hard `NOT_AUTHORIZED` / `officialReceiptEnabled=false` response
+- [x] M7.13–M7.15 — Backend security tests and real Spring Boot/PostgreSQL browser coverage on synthetic refunds, replay, authorization, aging, fiscal readiness
+- [x] Enabled hosted development regression: [39430975164](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39430975164) on `93928994`. Java/PG16 114/114 tests, frontend 42/42, standard Chromium 12/12, live backend E2E 4/4, Gitleaks pass.
+- [ ] **Production gates**: Real gateway refunds and external confirmation, credit notes, fiscal invoice numbering, VAT/non-VAT calculations, required tax disclosures/discounts, government-authorized document issuance and retention, formal tax/legal approval, OWASP, full M10 hardening, production migration/upgrade test and recovery.
+- [ ] Refunded cashflow must be validated against actual settlement timestamps and clinic timezone; the present summary is database-day based and not a certified closeout.
+
+See `docs/M7_FINANCIAL_CLOSURE_REVIEW.md`. No auto-merge. Do not begin clinical production use based on this development acceptance.
