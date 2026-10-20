@@ -66,4 +66,37 @@ test('M7 real-backend invoice/collections/void/security and reconciliation on Po
  const statement=await request.get(api+'/patients/'+patient+'/statement',{headers:auth(front)})
  expect(statement.status()).toBe(200)
  expect((await statement.json()).length).toBeGreaterThanOrEqual(1)
+ // Financial closure: a recorded external disbursement must reduce net collections.
+ const owner=await login(request,'owner@m25.test')
+ const deniedRefund=await request.post(url+'/payments/'+payments[0].id+'/refunds',{headers:auth(front),data:{
+   amount:10,method:'CASH',reference:'SYNTHETIC-RETURN-0001',reason:'Synthetic correction',idempotencyKey:'77777777-7777-4777-8777-777777777703'
+ }})
+ expect(deniedRefund.status()).toBe(403)
+ const refundBody={amount:10,method:'CASH',reference:'SYNTHETIC-RETURN-0001',reason:'Synthetic correction',
+    idempotencyKey:'77777777-7777-4777-8777-777777777703'}
+ const refunded=await request.post(url+'/payments/'+payments[0].id+'/refunds',{headers:auth(owner),data:refundBody})
+ expect(refunded.status()).toBe(201)
+ const replay=await request.post(url+'/payments/'+payments[0].id+'/refunds',{headers:auth(owner),data:refundBody})
+ expect(replay.status()).toBe(201)
+ expect((await replay.json()).id).toBe((await refunded.json()).id)
+ expect((await request.post(url+'/payments/'+payments[0].id+'/refunds',{headers:auth(owner),data:{...refundBody,amount:21,
+   idempotencyKey:'77777777-7777-4777-8777-777777777704'}})).status()).toBe(409)
+ expect((await request.post(url+'/payments/'+payments[0].id+'/void',{headers:auth(owner),data:{reason:'Not allowed after refund'}})).status()).toBe(409)
+ const netBalance=await request.get(url+'/balance',{headers:auth(front)})
+ expect(netBalance.status()).toBe(200)
+ expect(Number((await netBalance.json()).paid)).toBe(90)
+ const scheduled=await request.post(url+'/installments',{headers:auth(front),data:{dueDate:'2026-11-14',amount:10}})
+ expect(scheduled.status()).toBe(201)
+ const reconciliation=await request.get(url+'/installment-reconciliation?asOf=2026-11-15',{headers:auth(front)})
+ expect(reconciliation.status()).toBe(200)
+ expect(Number((await reconciliation.json()).netCollected)).toBe(90)
+ const fiscal=await request.get(api+'/fiscal-readiness',{headers:auth(owner)})
+ expect(fiscal.status()).toBe(200)
+ expect((await fiscal.json()).officialReceiptEnabled).toBe(false)
+ const fiscalUpdate=await request.put(api+'/fiscal-readiness',{headers:auth(owner),data:{
+  jurisdiction:'PH',registeredName:'Synthetic Clinic',registeredAddress:'Synthetic Test Address 100',
+  taxRegistrationNo:'SYNTHETIC-TAX-NO',taxCategory:'NON_VAT',permitReference:null
+ }})
+ expect(fiscalUpdate.status()).toBe(200)
+ expect((await fiscalUpdate.json()).documentStatus).toBe('NOT_AUTHORIZED')
 })

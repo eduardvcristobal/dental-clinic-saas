@@ -8,7 +8,7 @@ type Payment={id:string;amount:number;method:string;voided_at:string|null;paid_a
 type PlanItem={id:string;procedure_name:string;status:string}
 type Installment={id:string;due_date:string;amount:number;paid:boolean}
 const fmt=(value:number,currency:string)=>new Intl.NumberFormat('en',{style:'currency',currency:currency||'PHP'}).format(value)
-export function PatientBilling({patientId}:{patientId:string}){
+export function PatientBilling({patientId,role}:{patientId:string;role:string}){
  const [invoices,setInvoices]=useState<Invoice[]>([]),[selected,setSelected]=useState('')
  const [detail,setDetail]=useState<Invoice|null>(null),[branches,setBranches]=useState<Branch[]>([])
  const [plans,setPlans]=useState<Plan[]>([]),[payments,setPayments]=useState<Payment[]>([])
@@ -20,6 +20,9 @@ export function PatientBilling({patientId}:{patientId:string}){
  const [error,setError]=useState(''),[busy,setBusy]=useState(false)
  const [planItems,setPlanItems]=useState<PlanItem[]>([]),[installments,setInstallments]=useState<Installment[]>([])
  const [dueDate,setDueDate]=useState(''),[installmentAmount,setInstallmentAmount]=useState(0)
+ const [reconciled,setReconciled]=useState<{overdue:number;netCollected:number;installments:Array<{id:string;dueDate:string;allocated:number;remaining:number;status:string}>}|null>(null)
+ const [refundPayment,setRefundPayment]=useState(''),[refundAmount,setRefundAmount]=useState(0)
+ const [refundMethod,setRefundMethod]=useState('CASH'),[refundReference,setRefundReference]=useState(''),[refundReason,setRefundReason]=useState('')
  async function reload(){const rows=await api<Invoice[]>(`/api/billing/patients/${patientId}`);setInvoices(rows);setSelected(old=>rows.some(x=>x.id===old)?old:rows[0]?.id??'')}
  useEffect(()=>{let live=true;setInvoices([]);setSelected('');setDetail(null);setError('')
   void Promise.all([api<Invoice[]>(`/api/billing/patients/${patientId}`),
@@ -37,9 +40,11 @@ export function PatientBilling({patientId}:{patientId:string}){
  },[selected])
  async function refresh(){await reload();if(selected){setDetail(await api<Invoice>(`/api/billing/invoices/${selected}`));setPayments(await api<Payment[]>(`/api/billing/invoices/${selected}/payments`));setBalance(await api(`/api/billing/invoices/${selected}/balance`))}}
  async function act(op:()=>Promise<unknown>){setBusy(true);setError('');try{await op();await refresh()}catch(e){setError(e instanceof Error?e.message:'Billing request failed')}finally{setBusy(false)}}
- useEffect(()=>{let active=true;setPlanItems([]);setInstallments([])
+ useEffect(()=>{let active=true;setPlanItems([]);setInstallments([]);setReconciled(null)
   if(!detail)return
-  void api<Installment[]>(`/api/billing/invoices/${detail.id}/installments`).then(v=>{if(active)setInstallments(v)}).catch(e=>{if(active)setError(String(e))})
+  void Promise.all([api<Installment[]>(`/api/billing/invoices/${detail.id}/installments`),
+   api<{overdue:number;netCollected:number;installments:Array<{id:string;dueDate:string;allocated:number;remaining:number;status:string}>}>(`/api/billing/invoices/${detail.id}/installment-reconciliation?asOf=${new Date().toLocaleDateString('en-CA')}`)])
+   .then(([v,a])=>{if(active){setInstallments(v);setReconciled(a)}}).catch(e=>{if(active)setError(String(e))})
   if(detail.plan_id)void api<PlanItem[]>(`/api/billing/invoices/${detail.id}/plan-charges`)
    .then(x=>{if(active)setPlanItems(x)}).catch(e=>{if(active)setError(String(e))})
   return()=>{active=false}
@@ -93,7 +98,8 @@ export function PatientBilling({patientId}:{patientId:string}){
    </>}
    {['ISSUED','PARTIALLY_PAID'].includes(detail.status)&&<section aria-label="Installment schedule">
      <h4>Payment installments</h4>
-     <ul>{installments.map(item=><li key={item.id}>{item.due_date} — {fmt(Number(item.amount),currency)} {item.paid?'Paid':''}</li>)}</ul>
+     <ul>{installments.map(item=>{const allocation=reconciled?.installments.find(x=>x.id===item.id);return <li key={item.id}>{item.due_date} — {fmt(Number(item.amount),currency)} · {allocation?`${allocation.status}: ${fmt(Number(allocation.remaining),currency)} outstanding`:'Allocation pending'}</li>})}</ul>
+     <p>Allocated net collections: {fmt(Number(reconciled?.netCollected??0),currency)} · Past-due installments: {fmt(Number(reconciled?.overdue??0),currency)}. FIFO estimate as of today; does not settle a payment with a provider.</p>
      <label>Due date <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></label>
      <label>Installment amount <input type="number" min={0.01} step=".01" value={installmentAmount} onChange={e=>setInstallmentAmount(Number(e.target.value))}/></label>
      <button disabled={busy||!dueDate||installmentAmount<=0} onClick={()=>void act(()=>api(`/api/billing/invoices/${selected}/installments`,{
@@ -102,7 +108,21 @@ export function PatientBilling({patientId}:{patientId:string}){
     </section>}
    <h4>Payment history</h4>
    <ul>{payments.map(p=><li key={p.id}>{new Date(p.paid_at).toLocaleDateString()} — {fmt(Number(p.amount),currency)} ({p.method}) {p.voided_at?'VOIDED':''}</li>)}</ul>
-   <p>Payment acknowledgments are not official tax receipts. Fiscal receipt support requires separate certification.</p>
+   {['OWNER','ADMIN'].includes(role)&&payments.some(p=>!p.voided_at)&&<section aria-label="Manual refund evidence">
+    <h4>Record an already-disbursed refund</h4>
+    <p>This records evidence of money returned outside this system. It does not send funds.</p>
+    <label>Original payment <select value={refundPayment} onChange={e=>setRefundPayment(e.target.value)}><option value="">Choose payment</option>
+     {payments.filter(p=>!p.voided_at).map(p=><option key={p.id} value={p.id}>{fmt(Number(p.amount),currency)} — {p.method} ({p.id.slice(0,8)})</option>)}</select></label>
+    <label>Returned amount <input type="number" min={0.01} step=".01" value={refundAmount} onChange={e=>setRefundAmount(Number(e.target.value))}/></label>
+    <label>Disbursement method <select value={refundMethod} onChange={e=>setRefundMethod(e.target.value)}>{['CASH','CARD','BANK_TRANSFER','EWALLET','OTHER'].map(m=><option key={m} value={m}>{m}</option>)}</select></label>
+    <label>External evidence reference <input value={refundReference} maxLength={255} onChange={e=>setRefundReference(e.target.value)}/></label>
+    <label>Refund reason <input value={refundReason} maxLength={500} onChange={e=>setRefundReason(e.target.value)}/></label>
+    <button disabled={busy||!refundPayment||refundAmount<=0||refundReference.trim().length<3||refundReason.trim().length<3}
+      onClick={()=>void act(()=>api(`/api/billing/invoices/${selected}/payments/${refundPayment}/refunds`,{method:'POST',body:JSON.stringify({
+       amount:refundAmount,method:refundMethod,reference:refundReference,reason:refundReason,idempotencyKey:crypto.randomUUID()
+      })}))}>Record external refund evidence</button>
+   </section>}
+   <p>Payment acknowledgments and billing previews are not official tax receipts or invoices. Fiscal document issuance is disabled pending regulatory approval.</p>
   </>}
  </section>
 }

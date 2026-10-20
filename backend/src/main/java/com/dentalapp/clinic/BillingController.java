@@ -112,7 +112,7 @@ public class BillingController {
  @GetMapping("/invoices/{id}/balance") @Transactional(readOnly=true)
  public Map<String,Object> balance(Authentication a,@PathVariable UUID id){
   AuthPrincipal p=cashier(a);var bill=invoice(p.clinicId(),id,false);
-  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(p.amount - coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)),0) FROM payment p WHERE p.clinic_id=? AND p.invoice_id=? AND p.voided_at IS NULL",
    BigDecimal.class,p.clinicId(),id);
   BigDecimal total=(BigDecimal)bill.get("total");
   return Map.of("invoiceId",id,"currency",bill.get("currency_code"),"total",total,"paid",paid,"balance",total.subtract(paid));
@@ -135,7 +135,7 @@ public class BillingController {
   }
   if(!Set.of("ISSUED","PARTIALLY_PAID").contains(bill.get("status")))
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice is not collectible");
-  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(p.amount - coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)),0) FROM payment p WHERE p.clinic_id=? AND p.invoice_id=? AND p.voided_at IS NULL",
    BigDecimal.class,c,id);
   BigDecimal total=(BigDecimal)bill.get("total");
   if(paid.add(in.amount()).compareTo(total)>0)
@@ -164,7 +164,7 @@ public class BillingController {
   BigDecimal scheduled=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment_schedule WHERE clinic_id=? AND invoice_id=?",
    BigDecimal.class,c,id);
   BigDecimal outstanding=(BigDecimal)bill.get("total");
-  outstanding=outstanding.subtract(db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+  outstanding=outstanding.subtract(db.queryForObject("SELECT coalesce(sum(p.amount - coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)),0) FROM payment p WHERE p.clinic_id=? AND p.invoice_id=? AND p.voided_at IS NULL",
    BigDecimal.class,c,id));
   if(scheduled.add(in.amount()).compareTo(outstanding)>0)
    throw new ResponseStatusException(HttpStatus.CONFLICT,"Installments exceed outstanding balance");
@@ -190,6 +190,7 @@ public class BillingController {
   var out=new LinkedHashMap<String,Object>(rows.get(0));
   out.put("invoiceNo",bill.get("invoice_no"));out.put("currency",bill.get("currency_code"));
   out.put("patientId",bill.get("patient_id"));out.put("receiptStatus",out.get("voided_at")==null?"VALID":"VOID");
+  out.put("refundedAmount",db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment_refund WHERE clinic_id=? AND payment_id=?",BigDecimal.class,p.clinicId(),paymentId));
   out.put("notice","Payment acknowledgment only. Not an official tax invoice or receipt.");
   return out;
  }
@@ -198,8 +199,8 @@ public class BillingController {
   AuthPrincipal p=cashier(a);if(!exists("patient",p.clinicId(),patientId))
    throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Patient not found");
   return db.queryForList("SELECT i.id,i.invoice_no,i.currency_code,i.status,i.total,"+
-   "coalesce((SELECT sum(pay.amount) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS paid,"+
-   "i.total-coalesce((SELECT sum(pay.amount) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS balance "+
+   "coalesce((SELECT sum(pay.amount-coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=pay.clinic_id AND r.payment_id=pay.id),0)) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS paid,"+
+   "i.total-coalesce((SELECT sum(pay.amount-coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=pay.clinic_id AND r.payment_id=pay.id),0)) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS balance "+
    "FROM invoice i WHERE i.clinic_id=? AND i.patient_id=? ORDER BY i.created_at DESC LIMIT 200",p.clinicId(),patientId);
  }
 
@@ -215,10 +216,12 @@ public class BillingController {
   var existing=db.queryForList("SELECT id,voided_at FROM payment WHERE clinic_id=? AND invoice_id=? AND id=? FOR UPDATE",c,id,paymentId);
   if(existing.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Payment not found");
   if(existing.get(0).get("voided_at")!=null)throw new ResponseStatusException(HttpStatus.CONFLICT,"Payment already voided");
+  if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM payment_refund WHERE clinic_id=? AND payment_id=?)",Boolean.class,c,paymentId)))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Cannot void a payment with disbursed refunds; use a separate adjustment workflow");
   if("VOID".equals(bill.get("status")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice already voided");
   db.update("UPDATE payment SET voided_at=now(),void_reason=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND invoice_id=? AND id=?",
    in.reason().trim(),c,id,paymentId);
-  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(p.amount - coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)),0) FROM payment p WHERE p.clinic_id=? AND p.invoice_id=? AND p.voided_at IS NULL",
    BigDecimal.class,c,id);
   BigDecimal total=(BigDecimal)bill.get("total");
   db.update("UPDATE invoice SET status=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND id=?",
@@ -268,13 +271,16 @@ public class BillingController {
   AuthPrincipal p=cashier(a);UUID c=p.clinicId();
   BigDecimal invoiced=db.queryForObject("SELECT coalesce(sum(total),0) FROM invoice WHERE clinic_id=? AND status<>'VOID' AND issued_at IS NOT NULL",
    BigDecimal.class,c);
-  BigDecimal received=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND voided_at IS NULL",
+  BigDecimal received=db.queryForObject("SELECT coalesce(sum(p.amount-coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)),0) FROM payment p WHERE p.clinic_id=? AND p.voided_at IS NULL",
    BigDecimal.class,c);
   BigDecimal outstanding=invoiced.subtract(received);
   BigDecimal today=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND voided_at IS NULL AND paid_at>=date_trunc('day',now())",
    BigDecimal.class,c);
+  // Today's cashflow is measured at the event date, not the original payment date.
+  BigDecimal refundsToday=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment_refund WHERE clinic_id=? AND refunded_at>=date_trunc('day',now())",BigDecimal.class,c);
+  today=today.subtract(refundsToday);
   String currency=db.queryForObject("SELECT currency FROM clinic WHERE id=?",String.class,c);
-  var methods=db.queryForList("SELECT method,sum(amount) AS amount FROM payment WHERE clinic_id=? AND voided_at IS NULL GROUP BY method ORDER BY method",
+  var methods=db.queryForList("SELECT p.method,sum(p.amount-coalesce((SELECT sum(r.amount) FROM payment_refund r WHERE r.clinic_id=p.clinic_id AND r.payment_id=p.id),0)) AS amount FROM payment p WHERE p.clinic_id=? AND p.voided_at IS NULL GROUP BY p.method ORDER BY p.method",
    c);
   return Map.of("currency",currency,"invoiced",invoiced,"received",received,"outstanding",outstanding,
    "collectionsToday",today,"paymentMethods",methods);

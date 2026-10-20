@@ -73,7 +73,7 @@ function Patient360({ role }: { role: WorkspaceRole }) {
       {tab==='visits'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<PatientEncounters key={patient.id} patientId={patient.id}/>:<p role="alert">Clinical encounter access is restricted.</p>)}
       {tab==='chart'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<Odontogram key={patient.id} patientId={patient.id}/>:<p role="alert">Clinical chart access is restricted.</p>)}
       {tab==='plans'&&(['OWNER','ADMIN','DENTIST'].includes(role)?<PatientTreatmentPlans key={patient.id} patientId={patient.id} role={role}/>:<p role="alert">Treatment planning access is restricted.</p>)}
-      {tab==='billing'&&(['OWNER','ADMIN','FRONT_DESK'].includes(role)?<PatientBilling key={patient.id} patientId={patient.id}/>:<p role="alert">Billing access is restricted.</p>)}
+      {tab==='billing'&&(['OWNER','ADMIN','FRONT_DESK'].includes(role)?<PatientBilling key={patient.id} patientId={patient.id} role={role}/>:<p role="alert">Billing access is restricted.</p>)}
     </>})()}</>}
   </>
 }
