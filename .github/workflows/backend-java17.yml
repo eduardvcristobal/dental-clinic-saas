@@ -54,7 +54,7 @@ jobs:
           M4_UPGRADE_TEST_DB_URL: jdbc:postgresql://localhost:5432/dental_m4_upgrade
           M4_UPGRADE_TEST_DB_USER: postgres
           M4_UPGRADE_TEST_DB_PASSWORD: ci-owner-password
-        run: mvn -B -ntp verify
+        run: mvn -B -ntp clean verify
 
   frontend:
     runs-on: ubuntu-latest
@@ -191,7 +191,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Build Spring Boot
         working-directory: backend
-        run: mvn -B -ntp package -DskipTests
+        run: mvn -B -ntp clean package -DskipTests
       - name: Real-backend synthetic M4 browser regression
         run: bash scripts/m4_live_e2e.sh
         env:
