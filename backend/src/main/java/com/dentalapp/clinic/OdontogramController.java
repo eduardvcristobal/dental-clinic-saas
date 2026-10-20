@@ -4,6 +4,7 @@ import com.dentalapp.auth.AuthPrincipal;
 import com.dentalapp.odontogram.ToothNotation;
 import java.util.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -107,10 +108,15 @@ public class OdontogramController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"Finding already superseded");
         }
         UUID eventId=UUID.randomUUID();
-        db.update("INSERT INTO odontogram_finding_event "+
-            "(id,clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_by,supersedes_event_id) "+
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",eventId,clinic,chartId,patientId,input.toothNumber(),
-            input.surface(),input.conditionCode().trim(),k,s,input.notes(),p.userId(),input.supersedesEventId());
+        try {
+            db.update("INSERT INTO odontogram_finding_event "+
+                "(id,clinic_id,chart_id,patient_id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_by,supersedes_event_id) "+
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",eventId,clinic,chartId,patientId,input.toothNumber(),
+                input.surface(),input.conditionCode().trim(),k,s,input.notes(),p.userId(),input.supersedesEventId());
+        } catch (DataIntegrityViolationException conflict) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Clinical finding conflicts with an existing record or concurrent correction");
+        }
         return db.queryForMap("SELECT id,tooth_number,surface,condition_code,event_kind,clinical_status,notes,recorded_at,recorded_by,supersedes_event_id "+
                               "FROM odontogram_finding_event WHERE clinic_id=? AND patient_id=? AND id=?",clinic,patientId,eventId);
     }
