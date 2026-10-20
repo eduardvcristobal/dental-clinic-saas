@@ -1,5 +1,5 @@
 import { SchedulingWorkspace } from './SchedulingWorkspace'
-import { Odontogram } from './Odontogram'
+import { Odontogram } from './ClinicalOdontogram'
 import { PatientEncounters } from './PatientEncounters'
 import { PatientTreatmentPlans } from './PatientTreatmentPlans'
 import { PatientRegistry, PatientCare, type Patient } from './PatientRegistry'
