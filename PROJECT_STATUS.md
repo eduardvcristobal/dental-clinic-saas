@@ -1,14 +1,14 @@
 ## Current milestone snapshot
 
-M2 patient management is implemented through M2.4 and locally regressed under M2.5. CI-equivalent local tests pass, but hosted CI is BLOCKED by unavailable GitHub authentication and the NVD scan failed the CVSS threshold with unresolved critical/high dependency matches. M2 remains open. Do not start M3 or use real patient data.
+M1, M2 and M3 are complete for development. M3.10 local acceptance and hosted run `39388194937` passed on application SHA `244ee17`. M4 has not started. Production certification and real-patient use remain open under M10, including the tracked dependency findings.
 
 # Dental Clinic SaaS — Project Status
 
 **Last updated:** 2026-10-20
-**Authoritative baseline:** M1.4.6 accepted source plus M2.1–M2.4 implementation; M2.5 local regression in progress
-**Backend:** Java **17 LTS**, Spring Boot 3.3.5, PostgreSQL, Flyway  
+**Authoritative baseline:** M3.10 accepted application source `244ee177b0d85290f5adbd4efe30d99f83704d58`
+**Backend:** Java **17 LTS**, Spring Boot 3.5.16, PostgreSQL, Flyway
 **Frontend:** React, TypeScript, Vite  
-**Overall status:** M1 complete for development; M2 remains open pending hosted CI and remediation/triage of critical/high NVD dependency findings; **not production-ready**.
+**Overall status:** M1–M3 complete for development; M4 not started; **not production-ready**.
 
 ## Progress conventions
 
@@ -27,8 +27,8 @@ M2 patient management is implemented through M2.4 and locally regressed under M2
 | M0.6 | Patient workflow simulation & UX review | Implemented — verification and human design review pending | Seven-step fictional flow, no persistence, role-safe links, responsive review |
 | M0.7 | Permissions, module activation & navigation governance | Implemented — verification pending; backend entitlements not started | Central navigation registry, roles and honest readiness labels; no real feature activation |
 | M1 | Clinics, branches, dentists, chairs, staff | **COMPLETE FOR DEVELOPMENT — live E2E and hosted CI passed; production gates remain open** | Complete tenant/branch onboarding, permissions, real-account browser E2E, security and CI gates |
-| M2 | Patients, medical history, consent, search | **In progress — hosted CI blocked; NVD threshold failed** | Registration to searchable protected patient chart; final CI and high/critical dependency finding disposition required |
-| M3 | Multi-dentist/chair scheduling | Not started | Appointments, statuses, waitlist, conflict prevention |
+| M2 | Patients, medical history, consent, search | **COMPLETE FOR DEVELOPMENT — production dependency gate remains open** | Registration to searchable protected patient chart; hosted CI passed; high/critical dependency findings tracked for M10 |
+| M3 | Multi-dentist/chair scheduling | **COMPLETE FOR DEVELOPMENT — M3.10 local and hosted gates passed** | Appointments, statuses, waitlist, conflict prevention |
 | M4 | Odontogram | Not started | Adult/primary tooth surfaces, statuses, historical entries |
 | M5 | Visits and clinical documentation | Not started | SOAP notes, signed addenda, files, prescriptions |
 | M6 | Treatment plans | Not started | Procedures, phases, estimates, acceptance and completion |
@@ -407,10 +407,10 @@ Reports: `docs/M2_5_FINAL_ACCEPTANCE_REPORT.md`, `docs/M2_5_BACKEND_REGRESSION.m
 
 ## M3.1–M3.9 — Scheduling implementation (2026-10-20)
 
-**Status: IMPLEMENTED IN SOURCE, NOT YET RUNTIME CERTIFIED.** Nine milestone commits completed in sequence. Scheduling includes appointment policies, dentist availability, chair blocks, booking, calendar, lifecycle events, arrival queue, waitlist and notification outbox (without external delivery). Additional correction commits harden resource locking and fix V17 RLS migration quoting. See `docs/M3_1_TO_M3_9_DELIVERY_REPORT.md` for commits and validation limitations.
+**Handoff status at the time: implemented in source, not yet runtime certified.** Nine milestone commits completed in sequence. Scheduling includes appointment policies, dentist availability, chair blocks, booking, calendar, lifecycle events, arrival queue, waitlist and notification outbox (without external delivery). Additional correction commits harden resource locking and fix V17 RLS migration quoting. M3.10 acceptance below supersedes this handoff status. See `docs/M3_1_TO_M3_9_DELIVERY_REPORT.md` for commits and historical validation limitations.
 
-**M3.10 remains required** for Java 17, Flyway V1–V21/PostgreSQL restricted-role RLS, frontend tests, authenticated browser regression, concurrency, and hosted CI. Synthetic data only. Residual M2.5.1 dependency security findings remain tracked for M10.
+**M3.10 acceptance scope:** Java 17, Flyway V1–V21/PostgreSQL restricted-role RLS, frontend tests, authenticated browser regression, concurrency, and hosted CI. Synthetic data only. Residual M2.5.1 dependency security findings remain tracked for M10.
 
 ## M3.10 — Local scheduling acceptance (2026-10-20)
 
-**Status: LOCAL GATES PASSED; HOSTED CI PENDING.** Java 17 Maven `clean verify` passed 70/70 tests with no skips against fresh disposable PostgreSQL databases. This includes V1–V21 migration, V15→V21 upgrade, restricted-role RLS, concurrency, scheduling lifecycle, waitlist, outbox, and timezone/DST checks. Frontend 38/38 unit tests, build, lint, 10/10 mocked Chromium browser tests, and one live synthetic-identity browser workflow passed. The local engine was PostgreSQL 18.6; the hosted workflow uses PostgreSQL 16 and must pass on the final commit before M3 development acceptance. See `docs/M3_10_LOCAL_ACCEPTANCE_REPORT.md`. No real patient data was used.
+**Status: COMPLETE FOR DEVELOPMENT on application SHA `244ee17`.** Java 17 Maven `clean verify` passed 70/70 tests with no skips against fresh disposable PostgreSQL databases. This includes V1–V21 migration, V15→V21 upgrade, restricted-role RLS, concurrency, scheduling lifecycle, waitlist, outbox, and timezone/DST checks. Frontend 38/38 unit tests, build, lint, 10/10 mocked Chromium browser tests, and one live synthetic-identity browser workflow passed. Hosted run [39388194937](https://github.com/eduardvcristobal/dental-clinic-saas/actions/runs/39388194937) passed Java 17/PostgreSQL 16, frontend, browser and security; optional OWASP was skipped. See `docs/M3_10_ACCEPTANCE_REPORT.md`. No real patient data was used.
