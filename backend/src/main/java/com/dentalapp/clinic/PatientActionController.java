@@ -63,6 +63,7 @@ public final class PatientActionController {
  public Map<String,Object> redeem(@RequestBody RedeemInput in){
    if(!enabled)throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Patient responses disabled");
    if(in==null||in.clinicId()==null)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid patient action");
+   // Avoid leaking whether a guessed token ever existed for this tenant.
    byte[] hash;
    try{hash=tokens.hash(in.token());}
    catch(IllegalArgumentException ex){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid patient action");}
@@ -85,7 +86,7 @@ public final class PatientActionController {
       """,in.clinicId(),in.clinicId(),delivery);
       db.update("""
         UPDATE notification_delivery SET status='SUPPRESSED',failure_reason='Patient opted out',suppressed_at=now()
-        WHERE clinic_id=? AND status IN ('PENDING','FAILED') AND (patient_id,channel) IN
+        WHERE clinic_id=? AND status IN ('PENDING','FAILED','CLAIMED') AND (patient_id,channel) IN
           (SELECT patient_id,channel FROM notification_delivery WHERE clinic_id=? AND id=?)
       """,in.clinicId(),in.clinicId(),delivery);
     }else{
