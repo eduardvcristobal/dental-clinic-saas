@@ -22,6 +22,7 @@ public class BillingController {
  public record IssueInput(Long expectedVersion){}
  public record PaymentInput(BigDecimal amount,String method,String reference,UUID idempotencyKey){}
  public record InstallmentInput(LocalDate dueDate,BigDecimal amount){}
+ public record VoidInput(String reason){}
  private AuthPrincipal cashier(Authentication a){
   if(a==null||!(a.getPrincipal() instanceof AuthPrincipal p)||!Set.of("OWNER","ADMIN","FRONT_DESK").contains(p.role()))
    throw new AccessDeniedException("Billing permission required");
@@ -202,6 +203,41 @@ public class BillingController {
    "coalesce((SELECT sum(pay.amount) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS paid,"+
    "i.total-coalesce((SELECT sum(pay.amount) FROM payment pay WHERE pay.clinic_id=i.clinic_id AND pay.invoice_id=i.id AND pay.voided_at IS NULL),0) AS balance "+
    "FROM invoice i WHERE i.clinic_id=? AND i.patient_id=? ORDER BY i.created_at DESC LIMIT 200",p.clinicId(),patientId);
+ }
+
+ private AuthPrincipal financeManager(Authentication a){
+  AuthPrincipal p=cashier(a);
+  if(!Set.of("OWNER","ADMIN").contains(p.role()))throw new AccessDeniedException("Financial reversal requires manager");
+  return p;
+ }
+ private void reason(VoidInput in){require(in!=null&&in.reason()!=null&&in.reason().trim().length()>=3&&in.reason().length()<=500,"Reason required (3–500 characters)");}
+ @PostMapping("/invoices/{id}/payments/{paymentId}/void") @Transactional
+ public Map<String,Object> voidPayment(Authentication a,@PathVariable UUID id,@PathVariable UUID paymentId,@RequestBody VoidInput in){
+  AuthPrincipal p=financeManager(a);reason(in);UUID c=p.clinicId();var bill=invoice(c,id,true);
+  var existing=db.queryForList("SELECT id,voided_at FROM payment WHERE clinic_id=? AND invoice_id=? AND id=? FOR UPDATE",c,id,paymentId);
+  if(existing.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Payment not found");
+  if(existing.get(0).get("voided_at")!=null)throw new ResponseStatusException(HttpStatus.CONFLICT,"Payment already voided");
+  if("VOID".equals(bill.get("status")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice already voided");
+  db.update("UPDATE payment SET voided_at=now(),void_reason=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND invoice_id=? AND id=?",
+   in.reason().trim(),c,id,paymentId);
+  BigDecimal paid=db.queryForObject("SELECT coalesce(sum(amount),0) FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL",
+   BigDecimal.class,c,id);
+  BigDecimal total=(BigDecimal)bill.get("total");
+  db.update("UPDATE invoice SET status=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND id=?",
+   paid.signum()==0?"ISSUED":paid.compareTo(total)==0?"PAID":"PARTIALLY_PAID",c,id);
+  event(p,id,"PAYMENT_VOIDED",paymentId,in.reason().trim());
+  return balance(a,id);
+ }
+ @PostMapping("/invoices/{id}/void") @Transactional
+ public Map<String,Object> voidInvoice(Authentication a,@PathVariable UUID id,@RequestBody VoidInput in){
+  AuthPrincipal p=financeManager(a);reason(in);UUID c=p.clinicId();var bill=invoice(c,id,true);
+  if("VOID".equals(bill.get("status")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Invoice already voided");
+  if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM payment WHERE clinic_id=? AND invoice_id=? AND voided_at IS NULL)",
+   Boolean.class,c,id)))throw new ResponseStatusException(HttpStatus.CONFLICT,"Void or refund active collections first");
+  db.update("UPDATE invoice SET status='VOID',voided_at=now(),void_reason=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND id=?",
+   in.reason().trim(),c,id);
+  event(p,id,"INVOICE_VOIDED",null,in.reason().trim());
+  return detail(a,id);
  }
 
 }
