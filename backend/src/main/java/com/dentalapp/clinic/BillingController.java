@@ -23,6 +23,7 @@ public class BillingController {
  public record PaymentInput(BigDecimal amount,String method,String reference,UUID idempotencyKey){}
  public record InstallmentInput(LocalDate dueDate,BigDecimal amount){}
  public record VoidInput(String reason){}
+ public record PlanChargeInput(UUID planItemId){}
  private AuthPrincipal cashier(Authentication a){
   if(a==null||!(a.getPrincipal() instanceof AuthPrincipal p)||!Set.of("OWNER","ADMIN","FRONT_DESK").contains(p.role()))
    throw new AccessDeniedException("Billing permission required");
@@ -85,10 +86,7 @@ public class BillingController {
   BigDecimal gross=in.unitPrice().multiply(BigDecimal.valueOf(in.quantity()));
   require(in.discount().compareTo(gross)<=0,"Discount exceeds gross");
   if(in.procedureId()!=null)require(exists("procedure_catalog",c,in.procedureId()),"Procedure outside clinic");
-  if(in.planItemId()!=null)require(Boolean.TRUE.equals(db.queryForObject(
-   "SELECT EXISTS(SELECT 1 FROM treatment_plan_item i JOIN treatment_plan t ON t.clinic_id=i.clinic_id AND t.id=i.plan_id "+
-   "WHERE i.clinic_id=? AND i.id=? AND t.patient_id=? AND t.id=? AND i.status='COMPLETED')",
-   Boolean.class,c,in.planItemId(),bill.get("patient_id"),bill.get("plan_id"))),"Completed item on invoice plan required");
+  require(in.planItemId()==null,"Import completed treatment items with /plan-charge to preserve recorded prices");
   UUID line=UUID.randomUUID();BigDecimal net=gross.subtract(in.discount());
   db.update("INSERT INTO invoice_line(id,clinic_id,invoice_id,procedure_id,plan_item_id,description,quantity,unit_price,discount,line_total) VALUES(?,?,?,?,?,?,?,?,?,?)",
    line,c,id,in.procedureId(),in.planItemId(),in.description().trim(),in.quantity(),in.unitPrice(),in.discount(),net);
@@ -237,6 +235,31 @@ public class BillingController {
   db.update("UPDATE invoice SET status='VOID',voided_at=now(),void_reason=?,updated_at=now(),version=version+1 WHERE clinic_id=? AND id=?",
    in.reason().trim(),c,id);
   event(p,id,"INVOICE_VOIDED",null,in.reason().trim());
+  return detail(a,id);
+ }
+
+ @PostMapping("/invoices/{id}/plan-charge") @ResponseStatus(HttpStatus.CREATED) @Transactional
+ public Map<String,Object> importPlanCharge(Authentication a,@PathVariable UUID id,@RequestBody PlanChargeInput in){
+  AuthPrincipal p=cashier(a);UUID c=p.clinicId();var bill=invoice(c,id,true);
+  if(!"DRAFT".equals(bill.get("status")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Only draft invoice can import charges");
+  require(in!=null&&in.planItemId()!=null,"Completed plan item required");
+  require(bill.get("plan_id")!=null,"Invoice must be linked to a treatment plan");
+  var rows=db.queryForList("SELECT i.id,i.procedure_id,i.quantity,i.unit_price,i.discount,p.name AS procedure_name "+
+   "FROM treatment_plan_item i JOIN treatment_plan t ON t.clinic_id=i.clinic_id AND t.id=i.plan_id "+
+   "JOIN procedure_catalog p ON p.clinic_id=i.clinic_id AND p.id=i.procedure_id "+
+   "WHERE i.clinic_id=? AND i.id=? AND i.plan_id=? AND t.patient_id=? AND i.status='COMPLETED'",
+   c,in.planItemId(),bill.get("plan_id"),bill.get("patient_id"));
+  if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Completed treatment item from same patient and plan required");
+  var item=rows.get(0);
+  UUID line=UUID.randomUUID();BigDecimal gross=((BigDecimal)item.get("unit_price")).multiply(BigDecimal.valueOf(((Number)item.get("quantity")).longValue()));
+  BigDecimal discount=(BigDecimal)item.get("discount");BigDecimal net=gross.subtract(discount);
+  if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM invoice_line WHERE clinic_id=? AND plan_item_id=?)",
+   Boolean.class,c,in.planItemId())))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Treatment item already billed");
+  db.update("INSERT INTO invoice_line(id,clinic_id,invoice_id,procedure_id,plan_item_id,description,quantity,unit_price,discount,line_total) "+
+   "VALUES(?,?,?,?,?,?,?,?,?,?)",line,c,id,item.get("procedure_id"),in.planItemId(),item.get("procedure_name"),
+   item.get("quantity"),item.get("unit_price"),discount,net);
+  recalculate(c,id);event(p,id,"LINE_ADDED",line,"Imported completed treatment item "+in.planItemId());
   return detail(a,id);
  }
 
