@@ -90,6 +90,22 @@ class MigrationAndTenantIsolationTest {
                 SELECT count(*) FROM pg_indexes
                 WHERE schemaname=current_schema() AND indexname='uq_odontogram_single_supersession'
                 """, Integer.class)).isEqualTo(1);
+        // M5.2 clinical documentation tables must have FORCE RLS and INSERT-only history grants.
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
+              AND c.relname IN ('encounter_soap_draft','encounter_soap_revision','encounter_diagnosis')
+            """,Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_policies WHERE schemaname=current_schema()
+             AND tablename IN ('encounter_soap_draft','encounter_soap_revision','encounter_diagnosis')
+             AND policyname='tenant_isolation'
+            """,Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM information_schema.role_table_grants
+            WHERE grantee='dental_app' AND privilege_type='INSERT'
+              AND table_name IN ('encounter_soap_draft','encounter_soap_revision','encounter_diagnosis')
+            """,Integer.class)).isEqualTo(3);
         // A platform-wide session must not bypass tenant RLS for clinical records.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND policyname='platform_admin_access'", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname=current_schema() AND tablename='staff_invitation' AND policyname='tenant_isolation'", Integer.class)).isEqualTo(1);
