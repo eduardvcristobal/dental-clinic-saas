@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react'
 import {api} from '../api/client'
+import {deliveryStatusLabel} from './notificationStatus'
 type Delivery={id:string;patient_id:string;category:string;channel:string;status:string;scheduled_for:string;attempts:number;failure_reason:string|null}
 type Recall={id:string;patient_id:string;due_date:string;completed:boolean}
 type Policy={enabled:boolean;email_enabled:boolean;sms_enabled:boolean;reminder_hours_before:number}
@@ -39,7 +40,7 @@ export function NotificationWorkspace({role}:{role:string}){
   </section>
   <section><h2>Pending recalls</h2><ul>{recalls.map(r=><li key={r.id}>{r.due_date} — patient {r.patient_id.slice(0,8)} <button disabled={busy} onClick={()=>void submit('/api/notifications/recalls/'+r.id+'/schedule?channel='+channel,'POST')}>Queue {channel}</button></li>)}</ul></section>
   <section><h2>Notification center</h2><table><thead><tr><th>Type</th><th>Channel</th><th>Scheduled</th><th>Status</th></tr></thead><tbody>
-   {queue.map(d=><tr key={d.id}><td>{d.category}</td><td>{d.channel}</td><td>{new Date(d.scheduled_for).toLocaleString()}</td><td>{d.status}</td></tr>)}
+   {queue.map(d=><tr key={d.id}><td>{d.category}</td><td>{d.channel}</td><td>{new Date(d.scheduled_for).toLocaleString()}</td><td title={d.failure_reason??undefined}>{deliveryStatusLabel(d.status)}</td></tr>)}
   </tbody></table><button disabled={busy} onClick={()=>void load().catch(e=>setError(String(e)))}>Refresh queue</button></section>
  </section>
 }
