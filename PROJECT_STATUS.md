@@ -410,3 +410,16 @@ Reports: `docs/M2_5_FINAL_ACCEPTANCE_REPORT.md`, `docs/M2_5_BACKEND_REGRESSION.m
 **Status: IMPLEMENTED IN SOURCE, NOT YET RUNTIME CERTIFIED.** Nine milestone commits completed in sequence. Scheduling includes appointment policies, dentist availability, chair blocks, booking, calendar, lifecycle events, arrival queue, waitlist and notification outbox (without external delivery). Additional correction commits harden resource locking and fix V17 RLS migration quoting. See `docs/M3_1_TO_M3_9_DELIVERY_REPORT.md` for commits and validation limitations.
 
 **M3.10 remains required** for Java 17, Flyway V1–V21/PostgreSQL restricted-role RLS, frontend tests, authenticated browser regression, concurrency, and hosted CI. Synthetic data only. Residual M2.5.1 dependency security findings remain tracked for M10.
+
+
+## M4 — Odontogram & Dental Charting (2026-10-20; feature branch)
+
+**Current state: implemented in source; NOT certified or approved for clinical production.** Branch `feature/m4-odontogram` is independent of `main` and M3.10 agent changes. The historical snapshot at the top of this file refers to the earlier main baseline and must be reconciled before final merge.
+
+- [x] M4.1: V22 clinic-scoped odontogram schema, FDI tooth notation and append-only provenance; Java validator and test cases added.
+- [x] M4.2: Interactive adult, primary and mixed dentition in Patient 360, selected-patient API integration, surface choices and frontend unit-test cases added.
+- [x] M4.3: Authenticated chart read/observation/correction/retraction API with patient-scoped history.
+- [x] M4.4: V23 unique event supersession, V24 SQL correction provenance, role gates and security regression test cases.
+- [ ] M4.5: Full Java 17, PostgreSQL 16 migrations/RLS, browser E2E, CI and pre-merge verification — NOT RUN in this authoring environment; require actual evidence.
+
+Changes are limited to the M4 branch. Do not interpret an unrun test as passed, do not merge automatically, and do not enable real patient data. See `docs/M4_5_ODONTOGRAM_ACCEPTANCE.md`.
