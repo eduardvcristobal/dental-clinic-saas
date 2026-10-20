@@ -5,6 +5,8 @@ type Line={id:string;description:string;quantity:number;unit_price:number;discou
 type Branch={id:string;name:string}
 type Plan={id:string;title:string;status:string}
 type Payment={id:string;amount:number;method:string;voided_at:string|null;paid_at:string}
+type PlanItem={id:string;procedure_name:string;status:string}
+type Installment={id:string;due_date:string;amount:number;paid:boolean}
 const fmt=(value:number,currency:string)=>new Intl.NumberFormat('en',{style:'currency',currency:currency||'PHP'}).format(value)
 export function PatientBilling({patientId}:{patientId:string}){
  const [invoices,setInvoices]=useState<Invoice[]>([]),[selected,setSelected]=useState('')
@@ -16,6 +18,8 @@ export function PatientBilling({patientId}:{patientId:string}){
  const [paymentAmount,setPaymentAmount]=useState(0),[paymentMethod,setPaymentMethod]=useState('CASH'),[reference,setReference]=useState('')
  const [balance,setBalance]=useState<{balance:number;paid:number}|null>(null)
  const [error,setError]=useState(''),[busy,setBusy]=useState(false)
+ const [planItems,setPlanItems]=useState<PlanItem[]>([]),[installments,setInstallments]=useState<Installment[]>([])
+ const [dueDate,setDueDate]=useState(''),[installmentAmount,setInstallmentAmount]=useState(0)
  async function reload(){const rows=await api<Invoice[]>(`/api/billing/patients/${patientId}`);setInvoices(rows);setSelected(old=>rows.some(x=>x.id===old)?old:rows[0]?.id??'')}
  useEffect(()=>{let live=true;setInvoices([]);setSelected('');setDetail(null);setError('')
   void Promise.all([api<Invoice[]>(`/api/billing/patients/${patientId}`),
@@ -33,6 +37,13 @@ export function PatientBilling({patientId}:{patientId:string}){
  },[selected])
  async function refresh(){await reload();if(selected){setDetail(await api<Invoice>(`/api/billing/invoices/${selected}`));setPayments(await api<Payment[]>(`/api/billing/invoices/${selected}/payments`));setBalance(await api(`/api/billing/invoices/${selected}/balance`))}}
  async function act(op:()=>Promise<unknown>){setBusy(true);setError('');try{await op();await refresh()}catch(e){setError(e instanceof Error?e.message:'Billing request failed')}finally{setBusy(false)}}
+ useEffect(()=>{let active=true;setPlanItems([]);setInstallments([])
+  if(!detail)return
+  void api<Installment[]>(`/api/billing/invoices/${detail.id}/installments`).then(v=>{if(active)setInstallments(v)}).catch(e=>{if(active)setError(String(e))})
+  if(detail.plan_id)void api<{items:PlanItem[]}>(`/api/treatment-plans/${detail.plan_id}`)
+   .then(x=>{if(active)setPlanItems(x.items)}).catch(e=>{if(active)setError(String(e))})
+  return()=>{active=false}
+ },[detail?.id,detail?.plan_id])
  const currency=detail?.currency_code??'PHP'
  return <section className="ws-panel" aria-label="Patient billing">
   <h3>Patient invoices & collections</h3><p>Real financial records; subject to clinic billing permissions.</p>
@@ -53,6 +64,13 @@ export function PatientBilling({patientId}:{patientId:string}){
    <table><thead><tr><th>Description</th><th>Quantity</th><th>Amount</th></tr></thead><tbody>{(detail.lines??[]).map(x=>
     <tr key={x.id}><td>{x.description}</td><td>{x.quantity}</td><td>{fmt(Number(x.line_total),currency)}</td></tr>)}</tbody></table>
    {detail.status==='DRAFT'&&<>
+    {detail.plan_id&&<section aria-label="Completed plan charges"><h4>Import completed treatments</h4>
+      {planItems.filter(x=>x.status==='COMPLETED').map(item=><div key={item.id}>
+       <span>{item.procedure_name}</span>
+       <button disabled={busy} onClick={()=>void act(()=>api(`/api/billing/invoices/${selected}/plan-charge`,{
+        method:'POST',body:JSON.stringify({planItemId:item.id})
+       }))}>Import charge</button></div>)}
+      </section>}
     <h4>Add charge</h4>
     <label>Description <input value={description} maxLength={255} onChange={e=>setDescription(e.target.value)}/></label>
     <label>Quantity <input type="number" min={1} value={quantity} onChange={e=>setQuantity(Number(e.target.value))}/></label>
@@ -73,6 +91,15 @@ export function PatientBilling({patientId}:{patientId:string}){
       body:JSON.stringify({amount:paymentAmount,method:paymentMethod,reference:reference||null,idempotencyKey:crypto.randomUUID()})
      }))}>Record payment</button>
    </>}
+   {['ISSUED','PARTIALLY_PAID'].includes(detail.status)&&<section aria-label="Installment schedule">
+     <h4>Payment installments</h4>
+     <ul>{installments.map(item=><li key={item.id}>{item.due_date} — {fmt(Number(item.amount),currency)} {item.paid?'Paid':''}</li>)}</ul>
+     <label>Due date <input type="date" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></label>
+     <label>Installment amount <input type="number" min={0.01} step=".01" value={installmentAmount} onChange={e=>setInstallmentAmount(Number(e.target.value))}/></label>
+     <button disabled={busy||!dueDate||installmentAmount<=0} onClick={()=>void act(()=>api(`/api/billing/invoices/${selected}/installments`,{
+      method:'POST',body:JSON.stringify({dueDate,amount:installmentAmount})
+     }))}>Add installment</button>
+    </section>}
    <h4>Payment history</h4>
    <ul>{payments.map(p=><li key={p.id}>{new Date(p.paid_at).toLocaleDateString()} — {fmt(Number(p.amount),currency)} ({p.method}) {p.voided_at?'VOIDED':''}</li>)}</ul>
    <p>Payment acknowledgments are not official tax receipts. Fiscal receipt support requires separate certification.</p>
