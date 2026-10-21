@@ -49,6 +49,8 @@ public class AuthSecurity {
                                 throw new IllegalArgumentException("invalid platform admin claims");
                         } else {
                             UUIDFromClaim.require(jwt.getClaimAsString("clinic_id"));
+                            if (Boolean.TRUE.equals(jwt.getClaim("platform_admin")))
+                                throw new IllegalArgumentException("tenant user must not have platform-admin claim");
                             if (role == null || !List.of("OWNER", "ADMIN", "DENTIST", "FRONT_DESK").contains(role))
                                 throw new IllegalArgumentException("invalid role");
                         }
