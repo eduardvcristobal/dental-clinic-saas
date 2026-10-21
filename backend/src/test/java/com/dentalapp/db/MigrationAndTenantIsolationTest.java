@@ -192,6 +192,31 @@ class MigrationAndTenantIsolationTest {
             s.execute("INSERT INTO consent_form(id,clinic_id,patient_id,form_type) VALUES ('"+consentA+"','"+clinicA+"','"+patientA+"','Synthetic form A'),('"+consentB+"','"+clinicB+"','"+patientB+"','Synthetic form B')");
         }
 
+        // M8.11.6: two independent database sessions atomically increment the same tenant bucket.
+        // The conflict update must not lose counts when replicas contend.
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try (Connection first=appConnection(); Connection second=appConnection()) {
+            try (var st=first.createStatement()) {st.execute("SELECT set_config('app.clinic_id','"+clinicA+"',false)");}
+            try (var st=second.createStatement()) {st.execute("SELECT set_config('app.clinic_id','"+clinicA+"',false)");}
+            java.util.concurrent.Callable<Void> incrementsA=()->{
+                for(int k=0;k<20;k++)try(var st=first.createStatement()) {
+                    st.executeUpdate("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"','2000-01-01T00:00:00Z',1) ON CONFLICT(clinic_id,bucket_start) DO UPDATE SET attempts=notification_redemption_limit.attempts+1");
+                }
+                return null;
+            };
+            java.util.concurrent.Callable<Void> incrementsB=()->{
+                for(int k=0;k<20;k++)try(var st=second.createStatement()) {
+                    st.executeUpdate("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"','2000-01-01T00:00:00Z',1) ON CONFLICT(clinic_id,bucket_start) DO UPDATE SET attempts=notification_redemption_limit.attempts+1");
+                }
+                return null;
+            };
+            var one=pool.submit(incrementsA);
+            var two=pool.submit(incrementsB);
+            one.get();two.get();
+            try(var st=first.createStatement();var rs=st.executeQuery("SELECT attempts FROM notification_redemption_limit WHERE clinic_id='"+clinicA+"' AND bucket_start='2000-01-01T00:00:00Z'")) {
+                rs.next();assertThat(rs.getInt(1)).isEqualTo(40);
+            }
+        } finally {pool.shutdownNow();}
         try (Connection app = appConnection()) {
             app.setAutoCommit(false);
             try (var s = app.createStatement()) {
