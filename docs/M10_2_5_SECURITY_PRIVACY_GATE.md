@@ -1,9 +1,9 @@
 # M10.2–M10.5 — Authentication, tenancy, privacy and API protection
 
 ## Implemented controls and test evidence
-- M10.2: Existing stateless Bearer JWT principal validation, signature/issuer and role checks; tenant context sourced exclusively from authenticated principal. No new login mechanism or live OAuth production certification is claimed.
+- M10.2: Existing stateless Bearer JWT principal validation, signature/issuer and role checks; tenant context sourced exclusively from authenticated principal. Tenant JWTs with contradictory `platform_admin=true` are now rejected; new unit test exercises a signed contradictory token. No live OAuth production certification is claimed.
 - M10.3: PostgreSQL integration assertion inspects **every** current public `clinic_id` table for FORCE RLS; rejects any tenant table with missing RLS. Confirms application runtime role is neither superuser nor BYPASSRLS.
-- M10.4: Patient-data handling and release checklist below; infrastructure and policy enforcement requiring deployment configuration remain **open**, not certified.
+- M10.4: Explicit `Referrer-Policy: no-referrer` for API responses prevents sensitive URL leakage in Referer headers. Patient-data handling and release checklist below; infrastructure and policy enforcement requiring deployment configuration remain **open**, not certified.
 - M10.5: Configurable `APP_PATIENT_ACTION_RPM` additional per-remote-address protection for public token redemption; isolated from normal auth quotas, with 429, Retry-After and Cache-Control headers. Retains existing tenant-scoped PostgreSQL budget; **a shared edge rate limiter is still required**, because this new IP bucket is process-local.
 - M10.5: JUnit HTTP filter assertions for blocked/unblocked POST requests, 429 headers and window reset; invalid limits rejected.
 
