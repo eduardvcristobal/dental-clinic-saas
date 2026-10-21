@@ -21,10 +21,14 @@ fi
 
 # The private local env file is shell syntax, so values with special characters
 # can be quoted normally. It is ignored by git.
+ALLOW_SEED_OVERRIDE="${ALLOW_SEED:-}"
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
+if [[ -n "$ALLOW_SEED_OVERRIDE" ]]; then
+  ALLOW_SEED="$ALLOW_SEED_OVERRIDE"
+fi
 
 required_vars=(DB_URL DB_APP_USER DB_APP_PASSWORD DB_OWNER_USER DB_OWNER_PASSWORD GOOGLE_CLIENT_ID APP_JWT_SECRET APP_ALLOWED_ORIGINS)
 missing_vars=()
@@ -44,7 +48,7 @@ fi
 
 export APP_COOKIE_SECURE="${APP_COOKIE_SECURE:-false}"
 export APP_ALLOWED_ORIGINS="${APP_ALLOWED_ORIGINS:-http://localhost:5173}"
-export DB_URL DB_APP_USER DB_APP_PASSWORD DB_OWNER_USER DB_OWNER_PASSWORD GOOGLE_CLIENT_ID APP_JWT_SECRET
+export DB_URL DB_APP_USER DB_APP_PASSWORD DB_OWNER_USER DB_OWNER_PASSWORD GOOGLE_CLIENT_ID APP_JWT_SECRET ALLOW_SEED
 
 if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
   echo "Frontend dependencies are missing. Run 'npm ci' in $FRONTEND_DIR first." >&2

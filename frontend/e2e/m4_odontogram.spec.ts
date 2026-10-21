@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { pickDropdown } from './dropdown'
 
 const patientId='11111111-1111-4111-8111-111111111118'
 const clinic={id:'11111111-1111-4111-8111-111111111111',slug:'synthetic-clinic',name:'Synthetic Clinical Test Clinic'}
@@ -55,14 +56,14 @@ test('dentist selects permanent tooth and records immutable correction',async({p
  const {events}=await setup(page,'DENTIST')
  await page.getByRole('tab',{name:'Odontogram'}).click()
  await expect(page.getByRole('heading',{name:/Odontogram/})).toBeVisible()
- await page.getByLabel('Dentition').selectOption('mixed')
+ await pickDropdown(page, 'Dentition', 'Mixed dentition')
  await page.getByRole('button',{name:'11'}).click()
- await page.getByLabel('Surface').selectOption('I')
- await page.getByLabel('Finding').selectOption('CARIES')
+ await pickDropdown(page, 'Surface', 'I')
+ await pickDropdown(page, 'Finding', 'CARIES')
  await page.getByRole('button',{name:'Record new finding'}).click()
  await expect(page.getByText('OBSERVATION: CARIES')).toBeVisible()
  await page.getByRole('button',{name:'Correct / retract'}).click()
- await page.getByLabel('Finding').selectOption('RESTORATION')
+ await pickDropdown(page, 'Finding', 'RESTORATION')
  await page.getByRole('button',{name:'Record correction'}).click()
  await expect(page.getByText('CORRECTION: RESTORATION')).toBeVisible()
  expect(events).toHaveLength(2)

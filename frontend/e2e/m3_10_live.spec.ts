@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { pickDropdown } from './dropdown'
 
 /** M3.10 live scheduling workflow: real Spring Boot backend + fresh disposable PostgreSQL database.
  * All identities are synthetic local test tokens. */
@@ -60,8 +61,8 @@ test('owner/front desk/dentist complete the scheduling acceptance workflow again
   // 2. Owner configures dentist availability (Monday 09:00-17:00).
   {
     const cfg = page.locator('section', { has: page.getByRole('heading', { name: 'Dentist weekly availability' }) })
-    await cfg.getByLabel('Dentist').selectOption(dentistFix, { force: true })
-    await cfg.getByLabel('Weekday').selectOption('1', { force: true })
+    await pickDropdown(cfg, 'Dentist', dentistFix)
+    await pickDropdown(cfg, 'Weekday', 'Monday')
     await cfg.getByLabel('From', { exact: true }).fill('09:00', { force: true })
     await cfg.getByLabel('To', { exact: true }).fill('17:00', { force: true })
     await cfg.getByRole('button', { name: 'Save hours' }).click()
@@ -70,7 +71,7 @@ test('owner/front desk/dentist complete the scheduling acceptance workflow again
 
   // 3. Owner blocks the chair for maintenance late Monday.
   {
-    await page.getByRole('combobox', { name: 'Chair', exact: true }).last().selectOption(chairFix, { timeout: 15_000 })
+    await pickDropdown(page, 'Chair', chairFix)
     await page.getByLabel('Blocked from').fill(`${upcomingMonday}T16:00`)
     await page.getByLabel('Reason', { exact: true }).last().fill('maintenance')
     await page.getByRole('button', { name: 'Save chair block' }).click()
@@ -83,8 +84,8 @@ test('owner/front desk/dentist complete the scheduling acceptance workflow again
   await page.getByLabel("Date", { exact: true }).fill(upcomingMonday, { force: true })
   await page.getByLabel('Find patient').fill('Live Fix')
   await page.getByTestId('booking-patient').selectOption(patientA, { force: true })
-  await page.getByTestId('booking-dentist').selectOption(dentistFix, { force: true })
-  await page.getByTestId('booking-chair').selectOption(chairFix, { force: true })
+  await pickDropdown(page, 'Dentist', dentistFix)
+  await pickDropdown(page, 'Chair', chairFix)
   await page.getByTestId('booking-start').fill(`${upcomingMonday}T10:00`, { force: true })
   await page.getByRole('button', { name: 'Book appointment' }).click()
   await expect(page.getByText('Appointment created')).toBeVisible()
@@ -122,7 +123,7 @@ test('owner/front desk/dentist complete the scheduling acceptance workflow again
   // 8. A conflicting booking for the occupied slot is rejected.
   await page.getByLabel('Find patient').fill('Live Fix')
   await page.getByTestId('booking-patient').selectOption(patientA, { force: true })
-  await page.getByTestId('booking-dentist').selectOption(dentistFix, { force: true })
+  await pickDropdown(page, 'Dentist', dentistFix)
   await page.getByTestId('booking-start').fill(`${upcomingMonday}T11:00`, { force: true })
   await page.getByRole('button', { name: 'Book appointment' }).click()
   await expect(page.getByText(/Slot already booked|conflict/i).first()).toBeVisible({ timeout: 30_000 })
@@ -141,7 +142,7 @@ test('owner/front desk/dentist complete the scheduling acceptance workflow again
   await expect(page.getByText('Appointment cancelled')).toBeVisible()
 
   // The maintenance block prevents a booking on that chair.
-  await page.getByTestId('booking-chair').selectOption(chairFix, { force: true })
+  await pickDropdown(page, 'Chair', chairFix)
   await page.getByTestId('booking-start').fill(`${upcomingMonday}T16:00`, { force: true })
   await page.getByRole('button', { name: 'Book appointment' }).click()
   await expect(page.getByText(/Chair unavailable/i).first()).toBeVisible()

@@ -1,5 +1,8 @@
 import { useEffect,useState } from 'react'
 import { api } from '../api/client'
+import { Dropdown } from './Dropdown'
+import { useToast } from './toastContext'
+import { describeError } from './toast'
 type Plan={id:string;title:string;status:string;version:number;estimate_total?:number;items?:Item[];consent_reference?:string}
 type Item={id:string;procedure_name:string;tooth_number:number|null;phase:number;quantity:number;unit_price:number;discount:number;status:string}
 type Procedure={id:string;name:string;code:string;default_price:number;requires_tooth:boolean;requires_surface:boolean}
@@ -21,6 +24,7 @@ export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:st
  const [qty,setQty]=useState(1);const [price,setPrice]=useState(0);const [discount,setDiscount]=useState(0)
  const [consent,setConsent]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false)
  const [events,setEvents]=useState<Array<{id:string;event_type:string;event_at:string}>>([])
+ const toast=useToast()
  const load=async()=>{
   const rows=await api<Plan[]>(`/api/treatment-plans/patients/${encodeURIComponent(patientId)}`)
   setPlans(rows);setSelected(current=>rows.some(p=>p.id===current)?current:(rows[0]?.id??''))
@@ -31,18 +35,18 @@ export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:st
    api<Dentist[]>('/api/treatment-plans/dentists'),
    api<Encounter[]>(`/api/encounters/patients/${encodeURIComponent(patientId)}`)]).then(([p,c,r,e])=>{
     if(alive){setPlans(p);setSelected(p[0]?.id??'');setCatalog(c);setDentists(Array.isArray(r)?r:[]);setEncounters(e)}
-   }).catch(e=>{if(alive)setError(String(e))});return()=>{alive=false}
+   }).catch(e=>{if(alive)setError(describeError(e,'Could not load the treatment plans'))});return()=>{alive=false}
  },[patientId])
  useEffect(()=>{let alive=true;setDetail(null);setEvents([])
   if(!selected)return
   void Promise.all([api<Plan>(`/api/treatment-plans/${selected}`),
    api<Array<{id:string;event_type:string;event_at:string}>>(`/api/treatment-plans/${selected}/history`),
-   api<{currency:string}>(`/api/treatment-plans/${selected}/billing-preview`)]).then(([d,h,preview])=>{if(alive){setDetail(d);setEvents(h);setCurrency(preview.currency)}}).catch(e=>{if(alive)setError(String(e))})
+   api<{currency:string}>(`/api/treatment-plans/${selected}/billing-preview`)]).then(([d,h,preview])=>{if(alive){setDetail(d);setEvents(h);setCurrency(preview.currency)}}).catch(e=>{if(alive)setError(describeError(e,'Could not load the treatment plans'))})
   return()=>{alive=false}
  },[selected])
  const refresh=async()=>{await load();if(selected){setDetail(await api<Plan>(`/api/treatment-plans/${selected}`));setEvents(await api(`/api/treatment-plans/${selected}/history`))}}
- const execute=async(action:()=>Promise<unknown>)=>{setBusy(true);setError('')
-  try{await action();await refresh()}catch(e){setError(e instanceof Error?e.message:'Request failed')}finally{setBusy(false)}
+ const execute=async(action:()=>Promise<unknown>,success:string)=>{setBusy(true);setError('')
+  try{await action();await refresh();toast.success(success)}catch(e){toast.error(describeError(e,'Request failed'))}finally{setBusy(false)}
  }
  async function createProcedure(){
   setBusy(true);setError('')
@@ -52,7 +56,8 @@ export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:st
    })})
    setCatalog(await api<Procedure[]>('/api/treatment-plans/catalog'))
    setNewCode('');setNewName('');setNewPrice(0);setRequiresTooth(false)
-  }catch(e){setError(e instanceof Error?e.message:'Could not add procedure')}
+   toast.success('Clinic procedure added')
+  }catch(e){toast.error(describeError(e,'Could not add procedure'))}
   finally{setBusy(false)}
  }
  const chosen=catalog.find(p=>p.id===procedure)
@@ -69,17 +74,14 @@ export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:st
   </section>}
   <h4>Start treatment plan</h4>
   <label>Plan title <input value={title} maxLength={255} onChange={e=>setTitle(e.target.value)}/></label>
-  <label>Dentist <select value={dentistId} onChange={e=>setDentistId(e.target.value)}><option value="">Choose dentist</option>
-   {dentists.map(d=><option key={d.id} value={d.id}>{d.full_name}</option>)}</select></label>
+ <Dropdown label="Dentist" value={dentistId} placeholder="Choose dentist" options={[{value:'',label:'Choose dentist'},...dentists.map(d=>({value:d.id,label:d.full_name}))]} onChange={setDentistId}/>
   <button disabled={busy||!title.trim()||!dentistId} onClick={()=>void execute(async()=>{
    const created=await api<Plan>('/api/treatment-plans',{method:'POST',body:JSON.stringify({patientId,dentistId,title})})
    setSelected(created.id);setTitle('')
-  })}>Create draft plan</button>
+  },'Draft plan created')}>Create draft plan</button>
   <h4>Existing plans</h4>
   {!plans.length&&<p>No treatment plans yet.</p>}
-  <label>Selected plan <select value={selected} onChange={e=>setSelected(e.target.value)}>
-   <option value="">Choose plan</option>{plans.map(p=><option value={p.id} key={p.id}>{p.title} — {p.status}</option>)}
-  </select></label>
+ <Dropdown label="Selected plan" value={selected} placeholder="Choose plan" options={[{value:'',label:'Choose plan'},...plans.map(p=>({value:p.id,label:`${p.title} — ${p.status}`}))]} onChange={setSelected}/>
   {detail&&<>
    <h4>{detail.title} — {detail.status}</h4>
    <p><strong>Estimated total: {money(Number(detail.estimate_total??0),currency)}</strong></p>
@@ -91,20 +93,15 @@ export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:st
      {detail.status==='IN_PROGRESS'&&i.status==='PLANNED'&&
       <button type="button" disabled={busy} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items/${i.id}/progress`,{
         method:'POST',body:JSON.stringify({status:'SCHEDULED'})
-      }))}>Mark planned scheduling status (not a booking)</button>}
+      }),'Item marked as planned')}>Mark planned scheduling status (not a booking)</button>}
      {detail.status==='IN_PROGRESS'&&['PLANNED','SCHEDULED'].includes(i.status)&&
       <button type="button" disabled={busy||!visitId} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items/${i.id}/progress`,{
         method:'POST',body:JSON.stringify({status:'COMPLETED',visitId})
-      }))}>Record completed treatment</button>}
+      }),'Treatment recorded as completed')}>Record completed treatment</button>}
     </td></tr>)}</tbody></table>
-   {detail.status==='IN_PROGRESS'&&<label>Completed patient encounter for item evidence
-      <select value={visitId} onChange={e=>setVisitId(e.target.value)}><option value="">Choose completed encounter</option>
-       {encounters.filter(e=>e.encounter_status==='COMPLETED').map(e=><option key={e.id} value={e.id}>{new Date(e.started_at).toLocaleString()}</option>)}
-      </select></label>}
+ {detail.status==='IN_PROGRESS'&&<Dropdown label="Completed patient encounter for item evidence" value={visitId} placeholder="Choose completed encounter" options={[{value:'',label:'Choose completed encounter'},...encounters.filter(e=>e.encounter_status==='COMPLETED').map(e=>({value:e.id,label:new Date(e.started_at).toLocaleString()}))]} onChange={setVisitId}/>}
    {detail.status==='DRAFT'&&<div>
-    <h4>Add procedure</h4><label>Procedure <select value={procedure} onChange={e=>{
-      setProcedure(e.target.value);setPrice(Number(catalog.find(p=>p.id===e.target.value)?.default_price??0))
-     }}><option value="">Select</option>{catalog.map(p=><option key={p.id} value={p.id}>{p.name} ({p.code})</option>)}</select></label>
+ <h4>Add procedure</h4><Dropdown label="Procedure" value={procedure} placeholder="Select" options={[{value:'',label:'Select'},...catalog.map(p=>({value:p.id,label:`${p.name} (${p.code})`}))]} onChange={v=>{setProcedure(v);setPrice(Number(catalog.find(p=>p.id===v)?.default_price??0))}}/>
     {chosen?.requires_tooth&&<label>FDI tooth <input value={tooth} onChange={e=>setTooth(e.target.value)} inputMode="numeric"/></label>}
     <label>Quantity <input type="number" min={1} max={1000} value={qty} onChange={e=>setQty(Number(e.target.value))}/></label>
     <label>Unit price <input type="number" min={0} step=".01" value={price} onChange={e=>setPrice(Number(e.target.value))}/></label>
@@ -112,7 +109,7 @@ export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:st
     <button disabled={busy||!procedure||qty<1||price<0||discount<0||(!!chosen?.requires_tooth&&!tooth)}
      onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/items`,{method:'POST',body:JSON.stringify({
       procedureId:procedure,toothNumber:tooth?Number(tooth):null,surface:null,phase:1,quantity:qty,unitPrice:price,discount
-     })}))}>Add treatment item</button>
+     })}),'Treatment item added')}>Add treatment item</button>
    </div>}
    <div>
     {detail.status==='PROPOSED'&&<label>Consent record reference <input value={consent} maxLength={256} onChange={e=>setConsent(e.target.value)}/></label>}
@@ -120,10 +117,10 @@ export function PatientTreatmentPlans({patientId,role}:{patientId:string;role:st
       onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/transition`,{method:'POST',body:JSON.stringify({
        status:{DRAFT:'PROPOSED',PROPOSED:'ACCEPTED',ACCEPTED:'IN_PROGRESS',IN_PROGRESS:'COMPLETED'}[detail.status],
        expectedVersion:detail.version,consentReference:detail.status==='PROPOSED'?consent:null
-      })}))}>Move to {({DRAFT:'PROPOSED',PROPOSED:'ACCEPTED',ACCEPTED:'IN_PROGRESS',IN_PROGRESS:'COMPLETED'} as Record<string,string>)[detail.status]}</button>}
+      })}),'Plan status updated')}>Move to {({DRAFT:'PROPOSED',PROPOSED:'ACCEPTED',ACCEPTED:'IN_PROGRESS',IN_PROGRESS:'COMPLETED'} as Record<string,string>)[detail.status]}</button>}
     {detail.status==='PROPOSED'&&<button disabled={busy} onClick={()=>void execute(()=>api(`/api/treatment-plans/${selected}/transition`,{
      method:'POST',body:JSON.stringify({status:'DECLINED',expectedVersion:detail.version})
-    }))}>Record decline</button>}
+    }),'Plan declined')}>Record decline</button>}
    </div>
    <h4>Audit history</h4><ol>{events.map(e=><li key={e.id}>{e.event_type} — {new Date(e.event_at).toLocaleString()}</li>)}</ol>
   </>}

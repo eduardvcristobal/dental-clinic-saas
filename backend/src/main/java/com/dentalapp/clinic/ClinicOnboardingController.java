@@ -143,7 +143,22 @@ public class ClinicOnboardingController {
     @GetMapping("/invitations")
     public List<Map<String,Object>> invitations(Authentication auth) {
         UUID clinic=manager(auth).clinicId();
-        return db.queryForList("SELECT id,email,role,branch_id,expires_at,accepted_at,revoked_at FROM staff_invitation WHERE clinic_id=? ORDER BY created_at DESC",clinic);
+        return db.queryForList("SELECT id,email,role,branch_id,created_at,expires_at,accepted_at,revoked_at FROM staff_invitation WHERE clinic_id=? ORDER BY created_at DESC",clinic);
+    }
+    @PostMapping("/invitations/{id}/renew")
+    public InvitationCreated renewInvitation(Authentication auth,@PathVariable UUID id) {
+        AuthPrincipal user=manager(auth);
+        return tx.execute(status -> {
+            var rows=db.queryForList("SELECT id FROM staff_invitation WHERE id=? AND clinic_id=? AND accepted_at IS NULL AND revoked_at IS NULL FOR UPDATE",id,user.clinicId());
+            if(rows.size()!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Invitation cannot be renewed");
+            byte[] bytes=new byte[32];random.nextBytes(bytes);
+            String token=user.clinicId()+"."+Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            Instant expires=Instant.now().plusSeconds(604800);
+            int changed=db.update("UPDATE staff_invitation SET token_hash=?,expires_at=? WHERE id=? AND clinic_id=? AND accepted_at IS NULL AND revoked_at IS NULL",
+                hash(token),java.sql.Timestamp.from(expires),id,user.clinicId());
+            if(changed!=1) throw new ResponseStatusException(HttpStatus.CONFLICT,"Invitation can no longer be renewed");
+            return new InvitationCreated(id,token,expires.toString());
+        });
     }
     @PostMapping("/invitations/{id}/revoke") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void revoke(Authentication auth,@PathVariable UUID id) {
@@ -194,6 +209,20 @@ public class ClinicOnboardingController {
                 id,p.clinicId(),input.userId(),fullName,license,
                 input.specialty()==null?null:required(input.specialty(),150),input.calendarColor()==null?null:required(input.calendarColor(),30));
             event(p.clinicId(),p.userId(),"DENTIST_CREATED",id,null);
+            return db.queryForMap("SELECT id,user_id,full_name,license_no,specialty,calendar_color,active FROM dentist WHERE clinic_id=? AND id=?",p.clinicId(),id);
+        });
+    }
+    @PutMapping("/dentists/{id}")
+    public Map<String,Object> updateDentist(Authentication auth,@PathVariable UUID id,@RequestBody DentistInput input) {
+        AuthPrincipal p=manager(auth);
+        if(input==null) throw bad("Dentist profile details are required");
+        String fullName=required(input.fullName(),160),license=required(input.licenseNo(),100);
+        String specialty=input.specialty()==null||input.specialty().isBlank()?null:required(input.specialty(),150);
+        return tx.execute(status->{
+            int changed=db.update("UPDATE dentist SET full_name=?,license_no=?,specialty=? WHERE clinic_id=? AND id=? AND active=true",
+                fullName,license,specialty,p.clinicId(),id);
+            if(changed!=1) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Active dentist profile not found");
+            event(p.clinicId(),p.userId(),"DENTIST_UPDATED",id,null);
             return db.queryForMap("SELECT id,user_id,full_name,license_no,specialty,calendar_color,active FROM dentist WHERE clinic_id=? AND id=?",p.clinicId(),id);
         });
     }

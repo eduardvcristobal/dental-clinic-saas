@@ -43,3 +43,7 @@ app:
   onboarding:
     # Open registration must be explicitly enabled after abuse controls/operational checks.
     self-service-enabled: ${APP_ONBOARDING_SELF_SERVICE:false}
+
+  seed:
+    # Development data generation is disabled unless explicitly enabled at backend startup.
+    allow-seed: ${ALLOW_SEED:false}

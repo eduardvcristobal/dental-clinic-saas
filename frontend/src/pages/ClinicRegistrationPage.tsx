@@ -32,11 +32,11 @@ export function ClinicRegistrationPage() {
   return <main className="center"><section className="card login">
     <h1>Register a clinic</h1>
     {availabilityError ? <p role="alert" className="error">{availabilityError}</p> : registrationEnabled === null ? <p className="muted">Checking clinic registration availability…</p> : !registrationEnabled ? <p className="muted">Clinic registration is currently unavailable.</p> : created ? <p role="status">Clinic created. <Link to="/login">Sign in using its clinic code</Link>.</p> : <>
-      <label className="field">Clinic code<input required pattern="[a-z0-9][a-z0-9-]{2,62}" value={slug} onChange={e=>setSlug(e.target.value.toLowerCase())}/></label>
-      <label className="field">Clinic name<input required value={name} onChange={e=>setName(e.target.value)}/></label>
-      <label className="field">First branch<input required value={branchName} onChange={e=>setBranchName(e.target.value)}/></label>
-      <label className="field">Timezone<input required value={timezone} onChange={e=>setTimezone(e.target.value)}/></label>
-      <label className="field">Owner full name<input required value={ownerName} onChange={e=>setOwnerName(e.target.value)}/></label>
+      <label className="field">Clinic code<input required pattern="[a-z0-9][a-z0-9-]{2,62}" value={slug} placeholder="e.g. bright-smile-clinic" onChange={e=>setSlug(e.target.value.toLowerCase())}/></label>
+      <label className="field">Clinic name<input required value={name} placeholder="Enter your clinic name" onChange={e=>setName(e.target.value)}/></label>
+      <label className="field">First branch<input required value={branchName} placeholder="e.g. Main Branch" onChange={e=>setBranchName(e.target.value)}/></label>
+      <label className="field">Timezone<input required value={timezone} placeholder="e.g. Asia/Manila" onChange={e=>setTimezone(e.target.value)}/></label>
+      <label className="field">Owner full name<input required value={ownerName} placeholder="Enter your full name" onChange={e=>setOwnerName(e.target.value)}/></label>
       {error && <p role="alert" className="error">{error}</p>}
       <p className="muted small">Complete all fields, then verify with the first owner's Google account.</p>
       {slug && name && branchName && timezone && ownerName && !busy && <GoogleCredentialButton onSuccess={r=>void create(r.credential)} onError={()=>setError('Google verification failed')}/>}

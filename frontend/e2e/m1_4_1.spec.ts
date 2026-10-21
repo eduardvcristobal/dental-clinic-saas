@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { pickDropdown } from './dropdown'
 import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
@@ -239,7 +240,10 @@ test('owner invitation form submits a valid selected role and active branch', as
         id: '44444444-4444-4444-8444-444444444444', token: 'synthetic-invitation-token', expiresAt: '2030-01-01T00:00:00Z',
       }) })
     } else {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{
+        id: '55555555-5555-4555-8555-555555555555', email: 'recent@test.invalid', role: 'DENTIST', branch_id: branch.id,
+        created_at: '2026-10-20T09:15:00Z', expires_at: '2026-10-27T09:15:00Z', accepted_at: null, revoked_at: null,
+      }]) })
     }
   })
 
@@ -249,10 +253,13 @@ test('owner invitation form submits a valid selected role and active branch', as
   await page.getByRole('button', { name: 'Sign in with Google' }).click()
   await expect(page).toHaveURL(/\/workspace\//)
   await page.goto('/workspace/staff')
+  const recentMeta = page.locator('.ws-staff-invitation-meta').first()
+  await expect(recentMeta).toContainText('Invited')
+  await expect(recentMeta).toContainText('Expires')
+  await expect(recentMeta).toContainText('2026')
   await page.getByLabel('Email').fill('staff@test.invalid')
-  const roleSelect = page.locator('label').filter({ hasText: /^Role/ }).locator('select')
-  await roleSelect.selectOption('FRONT_DESK')
-  await expect(roleSelect).toHaveValue('FRONT_DESK')
+  await pickDropdown(page, 'Role', 'Front Desk')
+  await expect(page.getByRole('combobox', { name: 'Role', exact: true })).toHaveText('Front Desk')
   await page.getByRole('button', { name: 'Create invitation' }).click()
   await expect(page.getByText('One-time invitation created')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Copy private link' })).toBeVisible()
