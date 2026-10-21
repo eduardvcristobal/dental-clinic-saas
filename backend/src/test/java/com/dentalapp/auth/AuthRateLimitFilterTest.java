@@ -17,6 +17,21 @@ class AuthRateLimitFilterTest {
         assertThat(filter.allow("google:127.0.0.1", 2, Instant.EPOCH.plusSeconds(60))).isTrue();
     }
 
+    @Test void patientActionQuotaHasSeparateLimitAndKeys(){
+        var filter = new AuthRateLimitFilter(10, 30, 2, Clock.systemUTC());
+        var time = Instant.parse("2026-10-21T01:00:00Z");
+        assertThat(filter.allow("/api/patient-actions/redeem:192.0.2.5", 2, time)).isTrue();
+        assertThat(filter.allow("/api/patient-actions/redeem:192.0.2.5", 2, time.plusSeconds(1))).isTrue();
+        assertThat(filter.allow("/api/patient-actions/redeem:192.0.2.5", 2, time.plusSeconds(2))).isFalse();
+        assertThat(filter.allow("/api/patient-actions/redeem:192.0.2.6", 2, time.plusSeconds(2))).isTrue();
+        assertThat(filter.allow("/api/patient-actions/redeem:192.0.2.5", 2, time.plusSeconds(60))).isTrue();
+    }
+
+    @Test void rejectsInvalidPublicActionThrottle() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new AuthRateLimitFilter(10, 30, 0, Clock.systemUTC()));
+    }
+
     @Test void rejectsNonPositiveLimits() {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
                 () -> new AuthRateLimitFilter(0, 3, Clock.systemUTC()));
