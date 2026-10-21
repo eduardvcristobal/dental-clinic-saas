@@ -50,6 +50,7 @@ public class ReportsController {
   var appointment=db.queryForMap("""
     SELECT count(*) AS scheduled,
       count(*) FILTER(WHERE status='NO_SHOW') AS no_shows,
+      count(*) FILTER(WHERE status NOT IN ('CANCELLED')) AS eligible_appointments,
       count(*) FILTER(WHERE status='COMPLETED') AS completed
     FROM appointment WHERE clinic_id=? AND starts_at>=? AND starts_at<?
     """,clinic,w.from(),w.to());
@@ -66,6 +67,18 @@ public class ReportsController {
     SELECT coalesce(sum(amount),0) AS refunds
     FROM payment_refund WHERE clinic_id=? AND refunded_at>=? AND refunded_at<?
     """,clinic,w.from(),w.to());
+  var methods=db.queryForList("""
+    SELECT method,coalesce(sum(amount),0) AS amount
+    FROM payment WHERE clinic_id=? AND voided_at IS NULL AND paid_at>=? AND paid_at<?
+    GROUP BY method ORDER BY method
+    """,clinic,w.from(),w.to());
+  var firstVisits=db.queryForMap("""
+    SELECT count(*) AS first_locked_visits
+    FROM (
+      SELECT patient_id,min(started_at) AS first_at FROM visit
+      WHERE clinic_id=? AND locked_at IS NOT NULL GROUP BY patient_id
+    ) history WHERE first_at>=? AND first_at<?
+    """,clinic,w.from(),w.to());
   var patients=db.queryForMap("""
     SELECT count(*) AS registered FROM patient WHERE clinic_id=? AND created_at>=? AND created_at<?
     """,clinic,w.from(),w.to());
@@ -81,7 +94,13 @@ public class ReportsController {
     LEFT JOIN LATERAL (SELECT sum(amount) refunded FROM payment_refund WHERE clinic_id=i.clinic_id AND invoice_id=i.id AND refunded_at<?) r ON true
     WHERE i.clinic_id=? AND i.status NOT IN ('DRAFT','VOID') AND i.issued_at<?
     """,w.to(),w.to(),clinic,w.to());
-  return Map.of("from",from,"to",to,"currency",currency,"appointments",appointment,"revenue",revenue,
-    "payments",cash,"refunds",refunds,"patients",patients,"production",production,"receivables",ar);
+  Map<String,Object> result=new LinkedHashMap<>();
+  result.put("from",from);result.put("to",to);result.put("currency",currency);
+  result.put("appointments",appointment);result.put("revenue",revenue);
+  result.put("payments",cash);result.put("refunds",refunds);
+  result.put("paymentMethods",methods);result.put("patients",patients);
+  result.put("firstVisits",firstVisits);result.put("production",production);
+  result.put("receivables",ar);
+  return result;
  }
 }
