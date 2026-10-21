@@ -85,6 +85,8 @@ jobs:
         run: bash -n ../scripts/m10_backup.sh ../scripts/m10_restore_disposable.sh ../scripts/m10_quality_gate.sh ../scripts/m10_synthetic_query_probe.sh
       - name: Assert production operations scripts fail closed
         run: bash ../scripts/m10_ops_safety_test.sh
+      - name: Assert incomplete database archives are never published
+        run: bash ../scripts/m10_backup_integrity_test.sh
 
   # The browser suite is fully offline: it starts its own Vite dev server with a synthetic Google
   # client ID and intercepts every network call, so it needs no secrets and never touches a backend.
