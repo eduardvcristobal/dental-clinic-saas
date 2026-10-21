@@ -92,6 +92,7 @@ public class AuthSecurity {
           .authorizeHttpRequests(reg -> reg
              .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
              .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+             .requestMatchers(HttpMethod.GET, "/api/onboarding/status").permitAll()
              .requestMatchers("/api/onboarding/clinics", "/api/onboarding/accept", "/api/patient-actions/redeem", "/api/notification-webhooks/resend", "/api/notification-webhooks/twilio").permitAll()
              .requestMatchers("/api/auth/google", "/api/auth/platform-admin/google", "/api/auth/refresh", "/api/auth/logout").permitAll()
              .requestMatchers("/api/platform-admin/**").hasRole("PLATFORM_ADMIN")

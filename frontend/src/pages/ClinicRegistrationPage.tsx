@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { GoogleCredentialButton } from '../auth/GoogleCredentialButton'
@@ -12,6 +12,15 @@ export function ClinicRegistrationPage() {
   const [error, setError] = useState('')
   const [created, setCreated] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null)
+  const [availabilityError, setAvailabilityError] = useState('')
+  useEffect(() => {
+    let active = true
+    void api<{selfServiceEnabled:boolean}>('/api/onboarding/status', {}, false)
+      .then(status => { if (active) setRegistrationEnabled(status.selfServiceEnabled) })
+      .catch(() => { if (active) setAvailabilityError('Could not check clinic registration availability. Please try again later.') })
+    return () => { active = false }
+  }, [])
   async function create(googleIdToken?: string) {
     if (!googleIdToken) { setError('Google verification required'); return }
     setBusy(true);setError('')
@@ -22,8 +31,7 @@ export function ClinicRegistrationPage() {
   }
   return <main className="center"><section className="card login">
     <h1>Register a clinic</h1>
-    <p className="muted">Registration is disabled by default. An administrator must explicitly enable this service after security validation.</p>
-    {created ? <p role="status">Clinic created. <Link to="/login">Sign in using its clinic code</Link>.</p> : <>
+    {availabilityError ? <p role="alert" className="error">{availabilityError}</p> : registrationEnabled === null ? <p className="muted">Checking clinic registration availability…</p> : !registrationEnabled ? <p className="muted">Clinic registration is currently unavailable.</p> : created ? <p role="status">Clinic created. <Link to="/login">Sign in using its clinic code</Link>.</p> : <>
       <label className="field">Clinic code<input required pattern="[a-z0-9][a-z0-9-]{2,62}" value={slug} onChange={e=>setSlug(e.target.value.toLowerCase())}/></label>
       <label className="field">Clinic name<input required value={name} onChange={e=>setName(e.target.value)}/></label>
       <label className="field">First branch<input required value={branchName} onChange={e=>setBranchName(e.target.value)}/></label>

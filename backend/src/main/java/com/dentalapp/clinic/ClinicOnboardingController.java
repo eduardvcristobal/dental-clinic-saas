@@ -77,6 +77,10 @@ public class ClinicOnboardingController {
     private void event(UUID clinic,UUID actor,String action,UUID subject,String detail) {
         db.update("INSERT INTO clinic_admin_event(clinic_id,actor_id,action,subject_id,detail) VALUES(?,?,?,?,?)",clinic,actor,action,subject,detail);
     }
+    @GetMapping("/status")
+    public Map<String,Boolean> registrationStatus() {
+        return Map.of("selfServiceEnabled",selfServiceEnabled);
+    }
     @PostMapping("/clinics") @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> create(@RequestBody CreateClinic input,HttpServletRequest request) {
         origin(request);
