@@ -56,7 +56,7 @@ class MigrationAndTenantIsolationTest {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
         assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-                "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40");
+                "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
@@ -73,6 +73,16 @@ class MigrationAndTenantIsolationTest {
             SELECT count(*) FROM pg_roles WHERE rolname='dental_app'
               AND (rolsuper OR rolbypassrls)
             """,Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+            WHERE NOT t.tgisinternal AND t.tgname='m10_audit_immutable' AND c.relname='audit_log'
+            """,Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_indexes WHERE schemaname='public'
+             AND indexname IN ('idx_m10_invoice_issued','idx_m10_payment_paid',
+              'idx_m10_refund_at','idx_m10_appointment_start','idx_m10_patient_registered',
+              'idx_m10_plan_item_completed','idx_m10_visit_first_signed','idx_m10_audit_recent')
+            """,Integer.class)).isEqualTo(8);
         // M8.10.22: verify notification callbacks and actions remain under FORCE RLS.
         assertThat(jdbc.queryForObject("""
             SELECT count(*) FROM pg_class
