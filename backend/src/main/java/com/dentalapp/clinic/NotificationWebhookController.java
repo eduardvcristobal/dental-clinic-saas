@@ -35,6 +35,7 @@ public final class NotificationWebhookController {
   // Delivery correlation/tenant resolution is intentionally not performed until a verified
   // event parser and replay-safe persistent event processor have been reviewed.
   boolean reconciled=false;
+  boolean recognized=false;
   try{
    var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw);
    String event=json.path("type").asText("");
@@ -43,21 +44,14 @@ public final class NotificationWebhookController {
     case "email.bounced" -> "BOUNCED";case "email.failed" -> "FAILED";
     case "email.complained" -> "COMPLAINED";default -> "";
    };
+   recognized=!mapped.isEmpty();
    String ref=json.path("data").path("email_id").asText("");
    if(reconciler!=null&&!mapped.isEmpty())reconciled=reconciler.record("resend",ref,id,mapped,Instant.now());
   }catch(com.fasterxml.jackson.core.JsonProcessingException invalid){
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid callback JSON");
   }
-  if(reconciler!=null&&!reconciled&&raw.contains("\\\"type\\\"")){
-   // Known delivery events that arrive before the provider reference is committed
-   // must receive a retryable response, not a false-positive HTTP 200 acknowledgement.
-   var retryEvent=new com.fasterxml.jackson.databind.ObjectMapper();
-   try{
-    String kind=retryEvent.readTree(raw).path("type").asText("");
-    if(Set.of("email.sent","email.delivered","email.bounced","email.failed","email.complained").contains(kind))
-     throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Event not yet correlated");
-   }catch(com.fasterxml.jackson.core.JsonProcessingException ignored){}
-  }
+  if(reconciler!=null&&recognized&&!reconciled)
+   throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Event not yet correlated");
   return Map.of("authenticated",true,"reconciled",reconciled);
  }
  @PostMapping(path="/twilio",consumes="application/x-www-form-urlencoded")
