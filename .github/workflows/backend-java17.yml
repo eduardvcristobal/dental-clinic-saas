@@ -87,6 +87,13 @@ jobs:
         run: bash ../scripts/m10_ops_safety_test.sh
       - name: Assert incomplete database archives are never published
         run: bash ../scripts/m10_backup_integrity_test.sh
+      - name: Validate certification harnesses and fail-closed report
+        run: |
+          bash -n ../scripts/m10_encrypted_backup.sh ../scripts/m10_encrypted_restore_disposable.sh ../scripts/m10_two_replica_probe.sh ../scripts/m10_dependency_gate.sh
+          python3 ../scripts/m10_certification_report.py
+          python3 -c "import json; d=json.load(open('m10-certification-evidence.json')); assert d['decision']=='NO-GO'; assert all(x['status']=='BLOCKED' for x in d['checks'].values())"
+          rm -f m10-certification-evidence.json
+
 
   # The browser suite is fully offline: it starts its own Vite dev server with a synthetic Google
   # client ID and intercepts every network call, so it needs no secrets and never touches a backend.
