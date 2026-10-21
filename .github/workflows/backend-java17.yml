@@ -81,6 +81,9 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - name: Check M10 recovery and quality scripts syntax
+        working-directory: ..
+        run: bash -n scripts/m10_backup.sh scripts/m10_restore_disposable.sh scripts/m10_quality_gate.sh
 
   # The browser suite is fully offline: it starts its own Vite dev server with a synthetic Google
   # client ID and intercepts every network call, so it needs no secrets and never touches a backend.
