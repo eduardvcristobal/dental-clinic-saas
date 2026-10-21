@@ -13,17 +13,13 @@ command -v pg_restore >/dev/null || exit 2
 [[ -d "$M10_BACKUP_DESTINATION" && ! -L "$M10_BACKUP_DESTINATION" ]] || exit 2
 [[ "$M10_AGE_RECIPIENT" == age1* ]] || { echo 'Invalid age recipient' >&2; exit 2; }
 umask 077
-work="$(mktemp -d)"
-trap 'rm -rf -- "$work"' EXIT
-plain="$work/archive.dump"
-pg_dump --dbname="$M10_DATABASE_URL" --format=custom --no-owner --no-privileges --file="$plain"
-pg_restore --list "$plain" >/dev/null
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 out="$M10_BACKUP_DESTINATION/dental-$stamp.dump.age"
 [[ ! -e "$out" ]] || exit 2
 partial="$out.partial"
-trap 'rm -f -- "$partial"; rm -rf -- "$work"' EXIT
-age -r "$M10_AGE_RECIPIENT" -o "$partial" "$plain"
+trap 'rm -f -- "$partial"' EXIT
+# Stream the custom-format archive directly to authenticated encryption: no plaintext dump on disk.
+pg_dump --dbname="$M10_DATABASE_URL" --format=custom --no-owner --no-privileges | age -r "$M10_AGE_RECIPIENT" -o "$partial"
 [[ -s "$partial" ]] || exit 2
 mv -- "$partial" "$out"
 sha256sum "$out" > "$out.sha256"
