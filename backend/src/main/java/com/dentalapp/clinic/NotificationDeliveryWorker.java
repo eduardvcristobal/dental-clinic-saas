@@ -35,10 +35,9 @@ public final class NotificationDeliveryWorker {
   UUID id=tx.execute(s->{
    List<UUID> ids=db.queryForList("""
     SELECT id FROM notification_delivery
-    WHERE clinic_id=? AND (
-      (status IN ('PENDING','FAILED') AND scheduled_for<=now() AND (next_attempt_at IS NULL OR next_attempt_at<=now()))
-      OR (status='CLAIMED' AND lease_until<now())
-    ) AND attempts<10 ORDER BY scheduled_for,id FOR UPDATE SKIP LOCKED LIMIT 1
+    WHERE clinic_id=? AND status IN ('PENDING','FAILED')
+      AND scheduled_for<=now() AND (next_attempt_at IS NULL OR next_attempt_at<=now())
+      AND attempts<10 ORDER BY scheduled_for,id FOR UPDATE SKIP LOCKED LIMIT 1
     """,UUID.class,clinic);
    if(ids.isEmpty())return null;
    UUID next=ids.get(0);
@@ -83,6 +82,32 @@ public final class NotificationDeliveryWorker {
    return new Claim((UUID)r.get("patient_id"),(UUID)r.get("appointment_id"),channel,destination,(UUID)r.get("idempotency_key"),appointmentStart);
   });
   if(claim==null)return true;
+  // A committed scheduling/consent edit may have invalidated CLAIMED after eligibility
+  // was read. Recheck immediately before the external request and fail closed.
+  Boolean permitted=tx.execute(s->Boolean.TRUE.equals(db.queryForObject("""
+    SELECT EXISTS (
+      SELECT 1 FROM notification_delivery d
+      JOIN notification_consent co ON co.clinic_id=d.clinic_id
+        AND co.patient_id=d.patient_id AND co.channel=d.channel
+      JOIN notification_policy np ON np.clinic_id=d.clinic_id
+      JOIN patient p ON p.clinic_id=d.clinic_id AND p.id=d.patient_id
+      LEFT JOIN appointment a ON a.clinic_id=d.clinic_id AND a.id=d.appointment_id
+      WHERE d.clinic_id=? AND d.id=? AND d.status='CLAIMED'
+        AND co.consented AND np.enabled AND p.deleted_at IS NULL
+        AND ((d.channel='EMAIL' AND np.email_enabled AND p.email=?)
+          OR (d.channel='SMS' AND np.sms_enabled AND p.phone=?))
+        AND (d.appointment_id IS NULL OR
+          (a.status IN ('BOOKED','CONFIRMED') AND a.starts_at>?))
+    )
+    """,Boolean.class,clinic,id,claim.destination(),claim.destination(),Timestamp.from(Instant.now()))));
+  if(!Boolean.TRUE.equals(permitted)) {
+   tx.executeWithoutResult(s->db.update("""
+     UPDATE notification_delivery SET status='SUPPRESSED',suppressed_at=now(),
+       lease_until=NULL,failure_reason='Eligibility changed before send'
+     WHERE clinic_id=? AND id=? AND status='CLAIMED'
+     """,clinic,id));
+   return true;
+  }
   try{
    // Generic messages intentionally exclude diagnoses, procedures and patient names.
    NotificationTransport.Channel channel=NotificationTransport.Channel.valueOf(claim.channel());
@@ -96,9 +121,9 @@ public final class NotificationDeliveryWorker {
     Timestamp.from(result.acceptedAt()),clinic,id));
   }catch(RuntimeException e){
    tx.executeWithoutResult(s->db.update("""
-    UPDATE notification_delivery SET status=CASE WHEN attempts>=10 THEN 'SUPPRESSED' ELSE 'FAILED' END,
-      next_attempt_at=CASE WHEN attempts>=10 THEN NULL ELSE now() + (interval '1 second' * LEAST(3600,30*power(2,LEAST(attempts-1,7)))) END,
-      lease_until=NULL,failure_reason='Provider request unsuccessful'
+    UPDATE notification_delivery SET status='SUPPRESSED',
+      next_attempt_at=NULL,
+      lease_until=NULL,failure_reason='Provider outcome uncertain; reconcile manually before any retry'
     WHERE clinic_id=? AND id=? AND status='CLAIMED'
    """,clinic,id));
   }

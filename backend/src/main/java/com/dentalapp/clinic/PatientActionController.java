@@ -44,6 +44,14 @@ public final class PatientActionController {
   UUID id=tx.execute(s->{
    List<UUID> rows=db.queryForList("SELECT id FROM notification_delivery WHERE clinic_id=? AND id=? AND status IN ('ACCEPTED','DELIVERED') FOR UPDATE",UUID.class,p.clinicId(),in.deliveryId());
    if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Eligible delivery not found");
+   // Serialize issuance against the delivery row and cap active links per delivery.
+   // A staff account must not be able to mint an unlimited number of bearer tokens.
+   Integer active=db.queryForObject("""
+     SELECT count(*) FROM notification_patient_action
+     WHERE clinic_id=? AND delivery_id=? AND consumed_at IS NULL AND expires_at>now()
+     """,Integer.class,p.clinicId(),in.deliveryId());
+   if(active!=null&&active>=5)
+     throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Too many active patient links");
    UUID actionId=UUID.randomUUID();
    db.update("INSERT INTO notification_patient_action(id,clinic_id,delivery_id,token_hash,expires_at,requested_action) VALUES(?,?,?,?,?,?)",
      actionId,p.clinicId(),in.deliveryId(),hash,Timestamp.from(Instant.now().plus(Duration.ofHours(24))),in.action());
@@ -55,9 +63,14 @@ public final class PatientActionController {
  public Map<String,Object> redeem(@RequestBody RedeemInput in){
    if(!enabled)throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Patient responses disabled");
    if(in==null||in.clinicId()==null)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid patient action");
+   // Avoid leaking whether a guessed token ever existed for this tenant.
    byte[] hash;
    try{hash=tokens.hash(in.token());}
    catch(IllegalArgumentException ex){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid patient action");}
+   // Rate-limit public redemption by token-independent tenant bucket before any database lookup.
+   // This is an in-process defense-in-depth guard, not a substitute for edge/distributed limits.
+   if(!PatientRedemptionThrottle.allow(in.clinicId(),Instant.now()))
+     throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Too many patient action attempts");
    return TenantContext.callAs(in.clinicId(),()->tx.execute(s->{
     var rows=db.queryForList("""
       SELECT id,delivery_id,requested_action FROM notification_patient_action
@@ -77,7 +90,7 @@ public final class PatientActionController {
       """,in.clinicId(),in.clinicId(),delivery);
       db.update("""
         UPDATE notification_delivery SET status='SUPPRESSED',failure_reason='Patient opted out',suppressed_at=now()
-        WHERE clinic_id=? AND status IN ('PENDING','FAILED') AND (patient_id,channel) IN
+        WHERE clinic_id=? AND status IN ('PENDING','FAILED','CLAIMED') AND (patient_id,channel) IN
           (SELECT patient_id,channel FROM notification_delivery WHERE clinic_id=? AND id=?)
       """,in.clinicId(),in.clinicId(),delivery);
     }else{
