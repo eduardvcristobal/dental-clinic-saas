@@ -27,7 +27,8 @@ jobs:
       - name: Require NVD API key for Maven certification
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: test -n "$NVD_API_KEY" || { echo 'BLOCKED: NVD_API_KEY not configured' >&2; exit 1; }
+        run: |
+          test -n "$NVD_API_KEY" || { echo 'BLOCKED: NVD_API_KEY not configured' >&2; exit 1; }
       - name: Maven OWASP Dependency-Check
         working-directory: backend
         env:
