@@ -224,7 +224,7 @@ class MigrationAndTenantIsolationTest {
                 // Shared throttling must be atomic and invisible to other tenants.
                 s.execute("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"',date_trunc('minute',now()),1)");
                 s.execute("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"',date_trunc('minute',now()),1) ON CONFLICT(clinic_id,bucket_start) DO UPDATE SET attempts=notification_redemption_limit.attempts+1");
-                try (var rs=s.executeQuery("SELECT attempts FROM notification_redemption_limit WHERE clinic_id='"+clinicA+"' AND bucket_start=date_trunc('minute',now()))) {
+                try (var rs=s.executeQuery("SELECT attempts FROM notification_redemption_limit WHERE clinic_id='"+clinicA+"' AND bucket_start=date_trunc('minute',now())")) {
                     rs.next(); assertThat(rs.getInt(1)).isEqualTo(2);
                 }
                 assertSqlRejected(app,s,"INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicB+"',date_trunc('minute',now()),1)");
