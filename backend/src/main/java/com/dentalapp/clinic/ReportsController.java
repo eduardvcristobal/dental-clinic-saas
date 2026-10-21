@@ -35,6 +35,18 @@ public class ReportsController {
  @GetMapping("/summary") @Transactional(readOnly=true)
  public Map<String,Object> summary(Authentication auth,@RequestParam String from,@RequestParam String to){
   UUID clinic=requireAdmin(auth).clinicId();Window w=dates(from,to);
+  // No exchange-rate assumptions: never silently combine invoices from different currencies.
+  Integer distinctCurrencies=db.queryForObject("""
+    SELECT count(DISTINCT currency_code) FROM invoice
+    WHERE clinic_id=? AND status NOT IN ('DRAFT','VOID')
+    """,Integer.class,clinic);
+  if(distinctCurrencies!=null&&distinctCurrencies>1)
+   throw new ResponseStatusException(HttpStatus.CONFLICT,
+     "Multi-currency reporting requires a currency-specific filter; totals are unavailable");
+  String currency=db.queryForObject("""
+    SELECT coalesce(max(currency_code),'N/A') FROM invoice
+    WHERE clinic_id=? AND status NOT IN ('DRAFT','VOID')
+    """,String.class,clinic);
   var appointment=db.queryForMap("""
     SELECT count(*) AS scheduled,
       count(*) FILTER(WHERE status='NO_SHOW') AS no_shows,
@@ -69,7 +81,7 @@ public class ReportsController {
     LEFT JOIN LATERAL (SELECT sum(amount) refunded FROM payment_refund WHERE clinic_id=i.clinic_id AND invoice_id=i.id AND refunded_at<?) r ON true
     WHERE i.clinic_id=? AND i.status NOT IN ('DRAFT','VOID') AND i.issued_at<?
     """,w.to(),w.to(),clinic,w.to());
-  return Map.of("from",from,"to",to,"appointments",appointment,"revenue",revenue,
+  return Map.of("from",from,"to",to,"currency",currency,"appointments",appointment,"revenue",revenue,
     "payments",cash,"refunds",refunds,"patients",patients,"production",production,"receivables",ar);
  }
 }
