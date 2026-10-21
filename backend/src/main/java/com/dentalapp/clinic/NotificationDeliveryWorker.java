@@ -42,6 +42,12 @@ public final class NotificationDeliveryWorker {
    if(ids.isEmpty())return null;
    UUID next=ids.get(0);
    db.update("UPDATE notification_delivery SET status='CLAIMED',lease_until=now()+interval '60 seconds',attempts=attempts+1,last_attempt_at=now() WHERE clinic_id=? AND id=?",clinic,next);
+   db.update("""
+     INSERT INTO notification_delivery_attempt(clinic_id,delivery_id,idempotency_key,status)
+     SELECT clinic_id,id,idempotency_key,'CLAIMED'
+     FROM notification_delivery WHERE clinic_id=? AND id=?
+     ON CONFLICT(clinic_id,delivery_id) DO NOTHING
+     """,clinic,next);
    return next;
   });
   if(id==null)return false;
@@ -121,6 +127,10 @@ public final class NotificationDeliveryWorker {
       WHERE clinic_id=? AND id=? AND status='CLAIMED'
       """,result.providerReference(),channel==NotificationTransport.Channel.EMAIL?"resend":"twilio",
        Timestamp.from(result.acceptedAt()),clinic,id);
+    db.update("""
+      UPDATE notification_delivery_attempt SET status='ACCEPTED',provider_reference=?,concluded_at=now()
+      WHERE clinic_id=? AND delivery_id=?
+      """,result.providerReference(),clinic,id);
    });
   }catch(RuntimeException e){
    // Ambiguous provider outcomes must never be retried without authoritative reconciliation.
@@ -128,6 +138,10 @@ public final class NotificationDeliveryWorker {
      UPDATE notification_delivery SET status='SUPPRESSED',next_attempt_at=NULL,
        lease_until=NULL,failure_reason='Provider outcome uncertain; reconcile manually before any retry'
      WHERE clinic_id=? AND id=? AND status='CLAIMED'
+     """,clinic,id));
+   tx.executeWithoutResult(s->db.update("""
+     UPDATE notification_delivery_attempt SET status='UNKNOWN',concluded_at=now()
+     WHERE clinic_id=? AND delivery_id=? AND status='CLAIMED'
      """,clinic,id));
   }
   return true;
