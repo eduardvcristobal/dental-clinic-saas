@@ -49,6 +49,8 @@ public class AuthSecurity {
                                 throw new IllegalArgumentException("invalid platform admin claims");
                         } else {
                             UUIDFromClaim.require(jwt.getClaimAsString("clinic_id"));
+                            if (Boolean.TRUE.equals(jwt.getClaim("platform_admin")))
+                                throw new IllegalArgumentException("tenant user must not have platform-admin claim");
                             if (role == null || !List.of("OWNER", "ADMIN", "DENTIST", "FRONT_DESK").contains(role))
                                 throw new IllegalArgumentException("invalid role");
                         }
@@ -83,6 +85,8 @@ public class AuthSecurity {
     }
     @Bean SecurityFilterChain security(HttpSecurity http, TenantFilter tenantFilter, AuthRateLimitFilter rateLimitFilter, JwtDecoder decoder) throws Exception {
         http.csrf(csrf -> csrf.disable()) // Access-token APIs use Bearer, never cookie authentication.
+          .headers(headers -> headers.referrerPolicy(policy -> policy.policy(
+              org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
           .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
           .cors(cors -> {})
           .authorizeHttpRequests(reg -> reg

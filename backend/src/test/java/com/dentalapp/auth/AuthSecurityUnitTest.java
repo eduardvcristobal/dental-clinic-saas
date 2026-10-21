@@ -7,6 +7,25 @@ import java.util.UUID;
 import com.dentalapp.tenancy.TenantContext;
 
 class AuthSecurityUnitTest {
+  @Test void signedTenantJwtCannotAlsoClaimPlatformAdmin() {
+    var props=new AuthProperties("test","m10-ci-only-long-secret-at-least-thirty-two-bytes",
+            true,"","","");
+    var security=new AuthSecurity();
+    var claims=org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+      .issuer("dental-clinic-saas")
+      .subject(UUID.randomUUID().toString())
+      .issuedAt(java.time.Instant.now())
+      .expiresAt(java.time.Instant.now().plusSeconds(300))
+      .claim("clinic_id",UUID.randomUUID().toString())
+      .claim("role","OWNER")
+      .claim("platform_admin",true)
+      .build();
+    var encoded=security.jwtEncoder(props).encode(
+      org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(
+          org.springframework.security.oauth2.jwt.JwsHeader.with(org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256).build(),claims)).getTokenValue();
+    assertThrows(org.springframework.security.oauth2.jwt.JwtValidationException.class,
+      ()->security.jwtDecoder(props).decode(encoded));
+  }
   @Test void refreshCookieRejectsInvalidShapes() {
     assertThrows(ResponseStatusException.class, () -> AuthService.cookieClinic(null));
     assertThrows(ResponseStatusException.class, () -> AuthService.cookieClinic("other-clinic"));

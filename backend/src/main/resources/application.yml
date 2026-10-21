@@ -36,6 +36,9 @@ app:
     platform-admin-emails: ${CLINIC_PLATFORM_ADMIN_EMAILS:}
     login-requests-per-minute: ${APP_AUTH_LOGIN_RPM:10}
     refresh-requests-per-minute: ${APP_AUTH_REFRESH_RPM:30}
+    # Additional per-IP defense-in-depth for public patient token redemptions.
+    # A shared edge/WAF limiter is still required across replicated deployments.
+    patient-action-requests-per-minute: ${APP_PATIENT_ACTION_RPM:20}
 
   onboarding:
     # Open registration must be explicitly enabled after abuse controls/operational checks.

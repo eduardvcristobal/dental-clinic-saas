@@ -22,6 +22,7 @@ public final class AuthRateLimitFilter extends OncePerRequestFilter {
     private static final int MAX_KEYS = 10_000;
     private final int loginLimit;
     private final int refreshLimit;
+    private final int patientActionLimit;
     private final Clock clock;
     private final Map<String, Window> windows = new LinkedHashMap<>(128, .75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<String, Window> eldest) { return size() > MAX_KEYS; }
@@ -30,14 +31,20 @@ public final class AuthRateLimitFilter extends OncePerRequestFilter {
     @Autowired
     public AuthRateLimitFilter(
             @Value("${app.auth.login-requests-per-minute:10}") int loginLimit,
-            @Value("${app.auth.refresh-requests-per-minute:30}") int refreshLimit) {
-        this(loginLimit, refreshLimit, Clock.systemUTC());
+            @Value("${app.auth.refresh-requests-per-minute:30}") int refreshLimit,
+            @Value("${app.auth.patient-action-requests-per-minute:20}") int patientActionLimit) {
+        this(loginLimit, refreshLimit, patientActionLimit, Clock.systemUTC());
     }
 
     AuthRateLimitFilter(int loginLimit, int refreshLimit, Clock clock) {
-        if (loginLimit < 1 || refreshLimit < 1) throw new IllegalArgumentException("Auth rate limits must be positive");
+        this(loginLimit, refreshLimit, 20, clock);
+    }
+
+    AuthRateLimitFilter(int loginLimit, int refreshLimit, int patientActionLimit, Clock clock) {
+        if (loginLimit < 1 || refreshLimit < 1 || patientActionLimit < 1) throw new IllegalArgumentException("Auth rate limits must be positive");
         this.loginLimit = loginLimit;
         this.refreshLimit = refreshLimit;
+        this.patientActionLimit = patientActionLimit;
         this.clock = clock;
     }
 
@@ -48,6 +55,7 @@ public final class AuthRateLimitFilter extends OncePerRequestFilter {
         if (!"POST".equals(request.getMethod())) { chain.doFilter(request, response); return; }
         if ("/api/auth/google".equals(path) || "/api/auth/platform-admin/google".equals(path) || "/api/onboarding/clinics".equals(path) || "/api/onboarding/accept".equals(path)) limit = loginLimit;
         else if ("/api/auth/refresh".equals(path)) limit = refreshLimit;
+        else if ("/api/patient-actions/redeem".equals(path)) limit = patientActionLimit;
         else { chain.doFilter(request, response); return; }
 
         if (!allow(path + ":" + request.getRemoteAddr(), limit, clock.instant())) {
