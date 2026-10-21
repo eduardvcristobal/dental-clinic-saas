@@ -42,6 +42,12 @@ public final class NotificationDeliveryWorker {
    if(ids.isEmpty())return null;
    UUID next=ids.get(0);
    db.update("UPDATE notification_delivery SET status='CLAIMED',lease_until=now()+interval '60 seconds',attempts=attempts+1,last_attempt_at=now() WHERE clinic_id=? AND id=?",clinic,next);
+   db.update("""
+     INSERT INTO notification_delivery_attempt(clinic_id,delivery_id,idempotency_key,status)
+     SELECT clinic_id,id,idempotency_key,'CLAIMED'
+     FROM notification_delivery WHERE clinic_id=? AND id=?
+     ON CONFLICT(clinic_id,delivery_id) DO NOTHING
+     """,clinic,next);
    return next;
   });
   if(id==null)return false;
@@ -82,50 +88,61 @@ public final class NotificationDeliveryWorker {
    return new Claim((UUID)r.get("patient_id"),(UUID)r.get("appointment_id"),channel,destination,(UUID)r.get("idempotency_key"),appointmentStart);
   });
   if(claim==null)return true;
-  // A committed scheduling/consent edit may have invalidated CLAIMED after eligibility
-  // was read. Recheck immediately before the external request and fail closed.
-  Boolean permitted=tx.execute(s->Boolean.TRUE.equals(db.queryForObject("""
-    SELECT EXISTS (
-      SELECT 1 FROM notification_delivery d
-      JOIN notification_consent co ON co.clinic_id=d.clinic_id
-        AND co.patient_id=d.patient_id AND co.channel=d.channel
-      JOIN notification_policy np ON np.clinic_id=d.clinic_id
-      JOIN patient p ON p.clinic_id=d.clinic_id AND p.id=d.patient_id
-      LEFT JOIN appointment a ON a.clinic_id=d.clinic_id AND a.id=d.appointment_id
-      WHERE d.clinic_id=? AND d.id=? AND d.status='CLAIMED'
-        AND co.consented AND np.enabled AND p.deleted_at IS NULL
-        AND ((d.channel='EMAIL' AND np.email_enabled AND p.email=?)
-          OR (d.channel='SMS' AND np.sms_enabled AND p.phone=?))
-        AND (d.appointment_id IS NULL OR
-          (a.status IN ('BOOKED','CONFIRMED') AND a.starts_at>?))
-    )
-    """,Boolean.class,clinic,id,claim.destination(),claim.destination(),Timestamp.from(Instant.now()))));
-  if(!Boolean.TRUE.equals(permitted)) {
+  // Hold the delivery row lock throughout the bounded provider HTTP request. Appointment
+  // and consent invalidation triggers update this row and therefore serialize against send.
+  // A provider acknowledgement is not proof of patient delivery.
+  try{
+   tx.executeWithoutResult(s->{
+    Boolean permitted=Boolean.TRUE.equals(db.queryForObject("""
+      SELECT EXISTS (
+        SELECT 1 FROM notification_delivery d
+        JOIN notification_consent co ON co.clinic_id=d.clinic_id
+          AND co.patient_id=d.patient_id AND co.channel=d.channel
+        JOIN notification_policy np ON np.clinic_id=d.clinic_id
+        JOIN patient p ON p.clinic_id=d.clinic_id AND p.id=d.patient_id
+        LEFT JOIN appointment a ON a.clinic_id=d.clinic_id AND a.id=d.appointment_id
+        WHERE d.clinic_id=? AND d.id=? AND d.status='CLAIMED'
+          AND co.consented AND np.enabled AND p.deleted_at IS NULL
+          AND ((d.channel='EMAIL' AND np.email_enabled AND p.email=?)
+            OR (d.channel='SMS' AND np.sms_enabled AND p.phone=?))
+          AND (d.appointment_id IS NULL OR
+            (a.status IN ('BOOKED','CONFIRMED') AND a.starts_at>?))
+        FOR UPDATE OF d
+      )
+      """,Boolean.class,clinic,id,claim.destination(),claim.destination(),Timestamp.from(Instant.now())));
+    if(!permitted){
+     db.update("""
+       UPDATE notification_delivery SET status='SUPPRESSED',suppressed_at=now(),
+         lease_until=NULL,failure_reason='Eligibility changed before send'
+       WHERE clinic_id=? AND id=? AND status='CLAIMED'
+       """,clinic,id);
+     return;
+    }
+    NotificationTransport.Channel channel=NotificationTransport.Channel.valueOf(claim.channel());
+    var result=provider.deliver(new NotificationTransport.Delivery(clinic,claim.patient(),channel,claim.destination(),
+      claim.appointment()==null?"Please contact your clinic regarding your upcoming recall.":"Please contact your clinic regarding your upcoming appointment.",claim.key()));
+    db.update("""
+      UPDATE notification_delivery SET status='ACCEPTED',provider_reference=?,provider_name=?,
+        provider_status='ACCEPTED',sent_at=?,lease_until=NULL,next_attempt_at=NULL
+      WHERE clinic_id=? AND id=? AND status='CLAIMED'
+      """,result.providerReference(),channel==NotificationTransport.Channel.EMAIL?"resend":"twilio",
+       Timestamp.from(result.acceptedAt()),clinic,id);
+    db.update("""
+      UPDATE notification_delivery_attempt SET status='ACCEPTED',provider_reference=?,concluded_at=now()
+      WHERE clinic_id=? AND delivery_id=?
+      """,result.providerReference(),clinic,id);
+   });
+  }catch(RuntimeException e){
+   // Ambiguous provider outcomes must never be retried without authoritative reconciliation.
    tx.executeWithoutResult(s->db.update("""
-     UPDATE notification_delivery SET status='SUPPRESSED',suppressed_at=now(),
-       lease_until=NULL,failure_reason='Eligibility changed before send'
+     UPDATE notification_delivery SET status='SUPPRESSED',next_attempt_at=NULL,
+       lease_until=NULL,failure_reason='Provider outcome uncertain; reconcile manually before any retry'
      WHERE clinic_id=? AND id=? AND status='CLAIMED'
      """,clinic,id));
-   return true;
-  }
-  try{
-   // Generic messages intentionally exclude diagnoses, procedures and patient names.
-   NotificationTransport.Channel channel=NotificationTransport.Channel.valueOf(claim.channel());
-   var result=provider.deliver(new NotificationTransport.Delivery(clinic,claim.patient(),channel,claim.destination(),
-      claim.appointment()==null?"Please contact your clinic regarding your upcoming recall.":"Please contact your clinic regarding your upcoming appointment.",claim.key()));
    tx.executeWithoutResult(s->db.update("""
-    UPDATE notification_delivery SET status='ACCEPTED',provider_reference=?,provider_name=?,
-      provider_status='ACCEPTED',sent_at=?,lease_until=NULL,next_attempt_at=NULL
-    WHERE clinic_id=? AND id=? AND status='CLAIMED'
-   """,result.providerReference(),channel==NotificationTransport.Channel.EMAIL?"resend":"twilio",
-    Timestamp.from(result.acceptedAt()),clinic,id));
-  }catch(RuntimeException e){
-   tx.executeWithoutResult(s->db.update("""
-    UPDATE notification_delivery SET status='SUPPRESSED',
-      next_attempt_at=NULL,
-      lease_until=NULL,failure_reason='Provider outcome uncertain; reconcile manually before any retry'
-    WHERE clinic_id=? AND id=? AND status='CLAIMED'
-   """,clinic,id));
+     UPDATE notification_delivery_attempt SET status='UNKNOWN',concluded_at=now()
+     WHERE clinic_id=? AND delivery_id=? AND status='CLAIMED'
+     """,clinic,id));
   }
   return true;
  }

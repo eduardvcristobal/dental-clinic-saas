@@ -35,6 +35,7 @@ public final class NotificationWebhookController {
   // Delivery correlation/tenant resolution is intentionally not performed until a verified
   // event parser and replay-safe persistent event processor have been reviewed.
   boolean reconciled=false;
+  boolean recognized=false;
   try{
    var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw);
    String event=json.path("type").asText("");
@@ -43,11 +44,14 @@ public final class NotificationWebhookController {
     case "email.bounced" -> "BOUNCED";case "email.failed" -> "FAILED";
     case "email.complained" -> "COMPLAINED";default -> "";
    };
+   recognized=!mapped.isEmpty();
    String ref=json.path("data").path("email_id").asText("");
    if(reconciler!=null&&!mapped.isEmpty())reconciled=reconciler.record("resend",ref,id,mapped,Instant.now());
   }catch(com.fasterxml.jackson.core.JsonProcessingException invalid){
    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid callback JSON");
   }
+  if(reconciler!=null&&recognized&&!reconciled)
+   throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Event not yet correlated");
   return Map.of("authenticated",true,"reconciled",reconciled);
  }
  @PostMapping(path="/twilio",consumes="application/x-www-form-urlencoded")
@@ -63,6 +67,8 @@ public final class NotificationWebhookController {
   String reference=form.getOrDefault("MessageSid","");
   boolean reconciled=reconciler!=null&&!event.isEmpty()&&
    reconciler.record("twilio",reference,reference+"_"+event,event,Instant.now());
+  if(reconciler!=null&&!event.isEmpty()&&!reconciled)
+   throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Event not yet correlated");
   return Map.of("authenticated",true,"reconciled",reconciled);
  }
 }

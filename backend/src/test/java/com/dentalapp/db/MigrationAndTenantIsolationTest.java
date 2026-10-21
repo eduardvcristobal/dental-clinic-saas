@@ -56,7 +56,7 @@ class MigrationAndTenantIsolationTest {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
         assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-                "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38");
+                "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
@@ -92,6 +92,10 @@ class MigrationAndTenantIsolationTest {
             WHERE NOT t.tgisinternal AND t.tgname='notification_consent_withdrawal_sync'
               AND c.relname='notification_consent'
             """,Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT relrowsecurity AND relforcerowsecurity
+            FROM pg_class WHERE oid='notification_delivery_attempt'::regclass
+            """,Boolean.class)).isTrue();
         // M3 tables must carry forced tenant RLS and restricted-role grants.
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -188,10 +192,45 @@ class MigrationAndTenantIsolationTest {
             s.execute("INSERT INTO consent_form(id,clinic_id,patient_id,form_type) VALUES ('"+consentA+"','"+clinicA+"','"+patientA+"','Synthetic form A'),('"+consentB+"','"+clinicB+"','"+patientB+"','Synthetic form B')");
         }
 
+        // M8.11.6: two independent database sessions atomically increment the same tenant bucket.
+        // The conflict update must not lose counts when replicas contend.
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try (Connection first=appConnection(); Connection second=appConnection()) {
+            try (var st=first.createStatement()) {st.execute("SELECT set_config('app.clinic_id','"+clinicA+"',false)");}
+            try (var st=second.createStatement()) {st.execute("SELECT set_config('app.clinic_id','"+clinicA+"',false)");}
+            java.util.concurrent.Callable<Void> incrementsA=()->{
+                for(int k=0;k<20;k++)try(var st=first.createStatement()) {
+                    st.executeUpdate("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"','2000-01-01T00:00:00Z',1) ON CONFLICT(clinic_id,bucket_start) DO UPDATE SET attempts=notification_redemption_limit.attempts+1");
+                }
+                return null;
+            };
+            java.util.concurrent.Callable<Void> incrementsB=()->{
+                for(int k=0;k<20;k++)try(var st=second.createStatement()) {
+                    st.executeUpdate("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"','2000-01-01T00:00:00Z',1) ON CONFLICT(clinic_id,bucket_start) DO UPDATE SET attempts=notification_redemption_limit.attempts+1");
+                }
+                return null;
+            };
+            var one=pool.submit(incrementsA);
+            var two=pool.submit(incrementsB);
+            one.get();two.get();
+            try(var st=first.createStatement();var rs=st.executeQuery("SELECT attempts FROM notification_redemption_limit WHERE clinic_id='"+clinicA+"' AND bucket_start='2000-01-01T00:00:00Z'")) {
+                rs.next();assertThat(rs.getInt(1)).isEqualTo(40);
+            }
+        } finally {pool.shutdownNow();}
         try (Connection app = appConnection()) {
             app.setAutoCommit(false);
             try (var s = app.createStatement()) {
                 s.execute("SELECT set_config('app.clinic_id','"+clinicA+"',false)");
+                // Shared throttling must be atomic and invisible to other tenants.
+                s.execute("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"',date_trunc('minute',now()),1)");
+                s.execute("INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicA+"',date_trunc('minute',now()),1) ON CONFLICT(clinic_id,bucket_start) DO UPDATE SET attempts=notification_redemption_limit.attempts+1");
+                try (var rs=s.executeQuery("SELECT attempts FROM notification_redemption_limit WHERE clinic_id='"+clinicA+"' AND bucket_start=date_trunc('minute',now())")) {
+                    rs.next(); assertThat(rs.getInt(1)).isEqualTo(2);
+                }
+                assertSqlRejected(app,s,"INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts) VALUES ('"+clinicB+"',date_trunc('minute',now()),1)");
+                try (var rs=s.executeQuery("SELECT count(*) FROM notification_redemption_limit WHERE clinic_id='"+clinicB+"'")) {
+                    rs.next(); assertThat(rs.getInt(1)).isZero();
+                }
                 try (var rs = s.executeQuery("SELECT count(*) FROM patient")) { rs.next(); assertThat(rs.getInt(1)).isEqualTo(1); }
                 s.execute("UPDATE patient SET first_name='changed' WHERE clinic_id='"+clinicB+"'");
                 try (var rs = s.executeQuery("SELECT count(*) FROM patient WHERE clinic_id='"+clinicB+"'")) { rs.next(); assertThat(rs.getInt(1)).isZero(); }
