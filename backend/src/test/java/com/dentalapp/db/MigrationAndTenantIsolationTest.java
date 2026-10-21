@@ -61,6 +61,18 @@ class MigrationAndTenantIsolationTest {
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
                 """, Integer.class)).isGreaterThanOrEqualTo(30);
+        // M10.3: cover every new tenant table, not a fixed historical count.
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM information_schema.columns cols
+            JOIN pg_namespace n ON n.nspname=cols.table_schema
+            JOIN pg_class c ON c.relnamespace=n.oid AND c.relname=cols.table_name
+            WHERE cols.table_schema='public' AND cols.column_name='clinic_id'
+              AND c.relkind='r' AND (NOT c.relrowsecurity OR NOT c.relforcerowsecurity)
+            """,Integer.class)).as("Every clinic_id table must enforce FORCE RLS").isZero();
+        assertThat(jdbc.queryForObject("""
+            SELECT count(*) FROM pg_roles WHERE rolname='dental_app'
+              AND (rolsuper OR rolbypassrls)
+            """,Integer.class)).isZero();
         // M8.10.22: verify notification callbacks and actions remain under FORCE RLS.
         assertThat(jdbc.queryForObject("""
             SELECT count(*) FROM pg_class
