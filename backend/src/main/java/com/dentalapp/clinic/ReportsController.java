@@ -65,10 +65,10 @@ public class ReportsController {
   var ar=db.queryForMap("""
     SELECT coalesce(sum(greatest(0,i.total-coalesce(p.paid,0)+coalesce(r.refunded,0))),0) AS outstanding
     FROM invoice i
-    LEFT JOIN LATERAL (SELECT sum(amount) paid FROM payment WHERE clinic_id=i.clinic_id AND invoice_id=i.id AND voided_at IS NULL) p ON true
-    LEFT JOIN LATERAL (SELECT sum(amount) refunded FROM payment_refund WHERE clinic_id=i.clinic_id AND invoice_id=i.id) r ON true
+    LEFT JOIN LATERAL (SELECT sum(amount) paid FROM payment WHERE clinic_id=i.clinic_id AND invoice_id=i.id AND voided_at IS NULL AND paid_at<?) p ON true
+    LEFT JOIN LATERAL (SELECT sum(amount) refunded FROM payment_refund WHERE clinic_id=i.clinic_id AND invoice_id=i.id AND refunded_at<?) r ON true
     WHERE i.clinic_id=? AND i.status NOT IN ('DRAFT','VOID') AND i.issued_at<?
-    """,clinic,w.to());
+    """,w.to(),w.to(),clinic,w.to());
   return Map.of("from",from,"to",to,"appointments",appointment,"revenue",revenue,
     "payments",cash,"refunds",refunds,"patients",patients,"production",production,"receivables",ar);
  }
