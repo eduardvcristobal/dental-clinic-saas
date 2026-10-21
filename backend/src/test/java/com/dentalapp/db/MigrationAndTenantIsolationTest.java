@@ -213,7 +213,7 @@ class MigrationAndTenantIsolationTest {
             var one=pool.submit(incrementsA);
             var two=pool.submit(incrementsB);
             one.get();two.get();
-            try(var st=first.createStatement();var rs=st.executeQuery("SELECT attempts FROM notification_redemption_limit WHERE clinic_id='"+clinicA+"' AND bucket_start='2000-01-01T00:00:00Z'")) {
+            try(var st=first.createStatement();var rs=st.executeQuery("SELECT attempts FROM notification_redemption_limit WHERE clinic_id='"+clinicA+"' AND bucket_start=date_trunc('minute',now()) AND bucket_start='2000-01-01T00:00:00Z'")) {
                 rs.next();assertThat(rs.getInt(1)).isEqualTo(40);
             }
         } finally {pool.shutdownNow();}
