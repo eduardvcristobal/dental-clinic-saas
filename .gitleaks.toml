@@ -1,0 +1,5 @@
+# Gitleaks exclusions: exact historical synthetic negative-test placeholder only.
+# This does NOT exempt secrets in any other files/commits.
+[[allowlists]]
+description = "M10 synthetic invalid Bearer token in a historical curl negative test (not a credential)"
+fingerprints = ["25dfd1bd3d9dc8fc6fc1244af20825709d6d1167:scripts/m10_two_replica_probe.sh:curl-auth-header:10"]

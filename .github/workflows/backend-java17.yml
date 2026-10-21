@@ -85,6 +85,15 @@ jobs:
         run: bash -n ../scripts/m10_backup.sh ../scripts/m10_restore_disposable.sh ../scripts/m10_quality_gate.sh ../scripts/m10_synthetic_query_probe.sh
       - name: Assert production operations scripts fail closed
         run: bash ../scripts/m10_ops_safety_test.sh
+      - name: Assert incomplete database archives are never published
+        run: bash ../scripts/m10_backup_integrity_test.sh
+      - name: Validate certification harnesses and fail-closed report
+        run: |
+          bash -n ../scripts/m10_encrypted_backup.sh ../scripts/m10_encrypted_restore_disposable.sh ../scripts/m10_two_replica_probe.sh ../scripts/m10_dependency_gate.sh
+          python3 ../scripts/m10_certification_report.py
+          python3 -c "import json; d=json.load(open('m10-certification-evidence.json')); assert d['decision']=='NO-GO'; assert all(x['status']=='BLOCKED' for x in d['checks'].values())"
+          rm -f m10-certification-evidence.json
+
 
   # The browser suite is fully offline: it starts its own Vite dev server with a synthetic Google
   # client ID and intercepts every network call, so it needs no secrets and never touches a backend.
@@ -135,9 +144,9 @@ jobs:
           base="$(git merge-base HEAD origin/main)"
           echo "Gitleaks new-commit range: ${base}..HEAD"
           docker run --rm -v "$PWD:/repo:ro" -w /repo ghcr.io/gitleaks/gitleaks:v8.24.3 \
-            detect --source /repo --log-opts="${base}..HEAD" --redact --exit-code 2
+            detect --source /repo --log-opts="${base}..HEAD" --redact --verbose --exit-code 2
           docker run --rm -v "$PWD:/repo:ro" -w /repo ghcr.io/gitleaks/gitleaks:v8.24.3 \
-            detect --source /repo --no-git --redact --exit-code 2
+            detect --source /repo --no-git --redact --verbose --exit-code 2
       - uses: actions/dependency-review-action@v4
         if: github.event_name == 'pull_request' && vars.RUN_DEPENDENCY_REVIEW == 'true'
 

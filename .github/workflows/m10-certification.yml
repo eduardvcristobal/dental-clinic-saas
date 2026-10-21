@@ -1,0 +1,46 @@
+name: M10 Production Certification (explicit approval)
+on:
+  workflow_dispatch:
+    inputs:
+      approved:
+        description: 'Type SYNTHETIC-ONLY to run the dependency certification'
+        required: true
+        type: string
+jobs:
+  dependency-certification:
+    if: inputs.approved == 'SYNTHETIC-ONLY'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Node dependency audit
+        run: bash scripts/m10_dependency_gate.sh
+      - name: Require NVD API key for Maven certification
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          test -n "$NVD_API_KEY" || { echo 'BLOCKED: NVD_API_KEY not configured' >&2; exit 1; }
+      - name: Maven OWASP Dependency-Check
+        working-directory: backend
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >
+          mvn -B -ntp org.owasp:dependency-check-maven:12.1.6:check
+          -DfailBuildOnCVSS=7 -DfailOnError=true
+          -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
+      - name: Publish dependency evidence (no patient data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m10-dependency-certification
+          path: backend/target/dependency-check-report.html
+          retention-days: 14
