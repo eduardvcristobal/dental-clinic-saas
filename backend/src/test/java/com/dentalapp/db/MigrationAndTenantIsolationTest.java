@@ -56,7 +56,7 @@ class MigrationAndTenantIsolationTest {
         assertThat(jdbc.queryForObject("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname=current_user", Boolean.class)).isFalse();
         var migrations = jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String.class);
         assertThat(migrations).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-                "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39");
+                "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "40");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
                 WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity AND c.relforcerowsecurity
@@ -92,6 +92,10 @@ class MigrationAndTenantIsolationTest {
             WHERE NOT t.tgisinternal AND t.tgname='notification_consent_withdrawal_sync'
               AND c.relname='notification_consent'
             """,Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+            SELECT relrowsecurity AND relforcerowsecurity
+            FROM pg_class WHERE oid='notification_delivery_attempt'::regclass
+            """,Boolean.class)).isTrue();
         // M3 tables must carry forced tenant RLS and restricted-role grants.
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
