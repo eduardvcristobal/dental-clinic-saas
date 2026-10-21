@@ -25,3 +25,17 @@
 ## Operational safety
 M8 notification feature flags must stay OFF until separately approved. M9 is read-only and never sends patient contact messages.
 No real patient information in CI fixtures, metrics logs or screenshots.
+
+## Final M9 delivery checklist (development scope)
+- [x] M9.2 read-only clinic report API, ISO date validation, two-year range bounds, role gating and parameterized tenant predicates
+- [x] M9.3 treatment plan completed-item operational summary (historical signed production attribution remains a known limitation)
+- [x] M9.4 issued invoice sums, actual nonvoid payment receipts, recorded refunds and method breakdown; multi-currency totals fail closed
+- [x] M9.5 completed/no-show appointment counts and a rate excluding cancelled appointments from the denominator
+- [x] M9.6 invoice receivables net of payments and refund disbursements with transaction-date upper bounds; detailed historical A/R aging is not yet certified
+- [x] M9.7 registrations and separate first locked-visit cohort
+- [x] M9.8 real React clinic reporting route, role navigation, date filters, safe empty/error states and currency disclosure
+- [x] M9.9 Java role/date security tests and authenticated synthetic Playwright API contract registered in live PostgreSQL browser CI
+- [ ] Provider/financial/legal signoff and locale-specific accounting/historical analytics certification (separate mandatory production acceptance)
+
+## Release interpretation
+M9 is suitable for **development demonstration and synthetic-data regression**, not a certified financial or clinical production reporting release. No dashboard values should be represented as legally compliant receipts or official statements. No production authorization is implied by a green GitHub Actions run. Reviewers must verify Java, PostgreSQL, React, security and the M9-authenticated Playwright test actually passed on the final PR head before merge.
