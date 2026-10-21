@@ -85,6 +85,8 @@ public class AuthSecurity {
     }
     @Bean SecurityFilterChain security(HttpSecurity http, TenantFilter tenantFilter, AuthRateLimitFilter rateLimitFilter, JwtDecoder decoder) throws Exception {
         http.csrf(csrf -> csrf.disable()) // Access-token APIs use Bearer, never cookie authentication.
+          .headers(headers -> headers.referrerPolicy(policy -> policy.policy(
+              org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)))
           .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
           .cors(cors -> {})
           .authorizeHttpRequests(reg -> reg
