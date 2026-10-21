@@ -67,11 +67,20 @@ public final class PatientActionController {
    byte[] hash;
    try{hash=tokens.hash(in.token());}
    catch(IllegalArgumentException ex){throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid patient action");}
-   // Rate-limit public redemption by token-independent tenant bucket before any database lookup.
-   // This is an in-process defense-in-depth guard, not a substitute for edge/distributed limits.
+   // In-memory guard is defense-in-depth; the persistent counter applies across replicas.
    if(!PatientRedemptionThrottle.allow(in.clinicId(),Instant.now()))
      throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Too many patient action attempts");
-   return TenantContext.callAs(in.clinicId(),()->tx.execute(s->{
+   return TenantContext.callAs(in.clinicId(),()->{
+    // Commit rate budget independently so a rejected or expired token still consumes quota.
+    int budget=tx.execute(s->db.queryForObject("""
+      INSERT INTO notification_redemption_limit(clinic_id,bucket_start,attempts)
+      VALUES (?,date_trunc('minute',now()),1)
+      ON CONFLICT(clinic_id,bucket_start)
+        DO UPDATE SET attempts=notification_redemption_limit.attempts+1
+      RETURNING attempts
+      """,Integer.class,in.clinicId()));
+    if(budget>30)throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Too many patient action attempts");
+    return tx.execute(s->{
     var rows=db.queryForList("""
       SELECT id,delivery_id,requested_action FROM notification_patient_action
       WHERE clinic_id=? AND token_hash=? AND consumed_at IS NULL AND expires_at>now()
@@ -98,6 +107,7 @@ public final class PatientActionController {
         in.clinicId(),delivery,action);
     }
     return Map.<String,Object>of("accepted",true,"appointmentChanged",false);
-   }));
+    });
+   });
  }
 }
