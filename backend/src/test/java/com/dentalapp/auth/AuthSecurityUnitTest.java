@@ -21,7 +21,8 @@ class AuthSecurityUnitTest {
       .claim("platform_admin",true)
       .build();
     var encoded=security.jwtEncoder(props).encode(
-      org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(claims)).getTokenValue();
+      org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(
+          org.springframework.security.oauth2.jwt.JwsHeader.with(org.springframework.security.oauth2.jose.jws.MacAlgorithm.HS256).build(),claims)).getTokenValue();
     assertThrows(org.springframework.security.oauth2.jwt.JwtValidationException.class,
       ()->security.jwtDecoder(props).decode(encoded));
   }
