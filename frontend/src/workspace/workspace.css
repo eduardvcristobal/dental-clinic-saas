@@ -418,7 +418,7 @@
 .ws-command-action small{overflow:hidden;color:var(--ws-muted);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
 .ws-command-action-arrow{width:17px;height:17px;flex:none;margin-left:auto;color:var(--ws-muted);stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ws-command-overview-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(270px,1fr);align-items:stretch;gap:13px;margin-bottom:15px}
-.ws-readiness-card,.ws-weather-card,.ws-daily-focus{min-width:0;padding:17px;background:linear-gradient(145deg,color-mix(in srgb,var(--ws-soft) 24%,var(--ws-card)),var(--ws-card) 58%);border-color:color-mix(in srgb,var(--ws-accent) 15%,var(--ws-line));box-shadow:0 4px 15px color-mix(in srgb,var(--ws-text) 4%,transparent)}
+.ws-readiness-card,.ws-weather-card,.ws-daily-focus{min-width:0;padding:17px;background:linear-gradient(145deg,color-mix(in srgb,var(--ws-soft) 24%,var(--ws-card)),var(--ws-card) 58%);border-color:color-mix(in srgb,var(--ws-accent) 15%,var(--ws-line));box-shadow:0 4px 15px color-mix(in srgb,var(--ws-text) 4%,transparent)}.ws-command-heading+.ws-global-warning+.ws-readiness-card,.ws-command-heading+.ws-readiness-card,.ws-command-heading+.ws-global-warning+.ws-readiness-restored,.ws-command-heading+.ws-readiness-restored{margin-bottom:15px}
 .ws-readiness-heading,.ws-weather-heading{display:flex;align-items:center;gap:11px;min-width:0}
 .ws-readiness-heading>div,.ws-weather-heading>div{min-width:0;flex:1}
 .ws-readiness-heading h2,.ws-weather-heading h2,.ws-daily-focus h2,.ws-needs-attention h2{margin:3px 0;font-size:16px;letter-spacing:-.25px}
@@ -480,13 +480,15 @@
 .ws-command-metric-copy>span{overflow:hidden;color:var(--ws-muted);font-size:9px;text-overflow:ellipsis;white-space:nowrap}
 .ws-command-metric-arrow{width:15px;height:15px;flex:none;margin-left:auto;stroke:var(--ws-muted);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ws-command-lower{grid-template-columns:minmax(0,1.8fr) minmax(270px,1fr);align-items:start}
+.ws-command-lower>div{grid-column:1/-1}
 .ws-needs-attention{display:grid;gap:9px;padding:17px;background:linear-gradient(145deg,color-mix(in srgb,#fff4df 25%,var(--ws-card)),var(--ws-card) 56%)}
 .ws-needs-attention header{padding-bottom:8px;border-bottom:1px solid var(--ws-line)}
 .ws-needs-attention>a:not(.ws-primary-link){display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px;border:1px solid transparent;border-radius:10px;color:var(--ws-text);text-decoration:none}
 .ws-needs-attention>a:not(.ws-primary-link):hover{border-color:var(--ws-line);background:var(--ws-bg)}
-.ws-attention-count{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#fce9e7;color:#b64a3c;font-size:14px;font-weight:800}
-.ws-attention-count.is-amber{background:#fff1d8;color:#a66b12}
-.ws-attention-count.is-blue{background:#eaf0ff;color:#4269c8}
+.ws-attention-count{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#eaf0ff;color:#2563eb;font-size:14px;font-weight:800}
+.ws-attention-count.is-booked{background:#eaf0ff;color:#2563eb}
+.ws-attention-count.is-arrived{background:#fff1d8;color:#b45309}
+.ws-attention-count.is-recall{background:#e0f5f7;color:#0e7490}
 .ws-needs-attention>a>span:nth-child(2){display:grid;gap:3px;min-width:0}
 .ws-needs-attention>a strong{font-size:10px}
 .ws-needs-attention>a small{color:var(--ws-muted);font-size:9px;line-height:1.4}
@@ -544,7 +546,7 @@
 @media(max-width:650px){.ws-toast-stack{right:12px;left:12px;bottom:12px;width:auto}}
 
 /* Command center day board: whole-day resource timeline grouped by branch. */
-.ws-dayboard{display:grid;gap:13px}
+.ws-dayboard{display:grid;gap:13px;background:linear-gradient(145deg,color-mix(in srgb,var(--ws-soft) 32%,var(--ws-card)),var(--ws-card) 62%)}
 .ws-dayboard-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
 .ws-dayboard-heading h3{margin:2px 0 3px;font-size:16px;font-weight:750}
 .ws-dayboard-heading p{margin:0;color:var(--ws-muted);font-size:12px}
