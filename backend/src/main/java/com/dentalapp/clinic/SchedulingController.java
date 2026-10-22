@@ -27,6 +27,7 @@ public class SchedulingController {
     public record StatusInput(String status,String reason) {}
     public record RescheduleInput(Instant startsAt,Instant endsAt,String reason) {}
     public record WaitlistInput(UUID patientId,UUID branchId,UUID appointmentTypeId,Instant preferredAfter,Instant preferredBefore) {}
+    public record HolidayInput(UUID branchId,LocalDate startsOn,LocalDate endsOn,String name,String note) {}
 
     private AuthPrincipal staff(Authentication a) {
         if (a==null || !(a.getPrincipal() instanceof AuthPrincipal p)) throw new AccessDeniedException("Clinic staff required");
@@ -91,6 +92,7 @@ public class SchedulingController {
         require(!b.startsAt().isBefore(now.plusSeconds(notice*60L)) && !b.startsAt().isAfter(now.plusSeconds(horizon*86400L)),"Outside booking window");
         ZoneId tz=zone(clinic); ZonedDateTime start=b.startsAt().atZone(tz),end=b.endsAt().atZone(tz);
         require(start.toLocalDate().equals(end.toLocalDate()),"Booking cannot span clinic-local dates");
+        require(!Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM clinic_holiday WHERE clinic_id=? AND (branch_id IS NULL OR branch_id=?) AND starts_on<=? AND ends_on>=?)",Boolean.class,clinic,b.branchId(),start.toLocalDate(),start.toLocalDate())),"Branch is closed for this holiday");
         int weekday=start.getDayOfWeek().getValue();
         require(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM branch_operating_hour WHERE clinic_id=? AND branch_id=? AND day_of_week=? AND opens_at<=? AND closes_at>=?)",Boolean.class,clinic,b.branchId(),weekday,start.toLocalTime(),end.toLocalTime())),"Outside branch operating hours");
         require(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM dentist_availability WHERE clinic_id=? AND dentist_id=? AND branch_id=? AND day_of_week=? AND starts_at<=? AND ends_at>=?)",Boolean.class,clinic,b.dentistId(),b.branchId(),weekday,start.toLocalTime(),end.toLocalTime())),"Outside dentist availability");
@@ -221,10 +223,72 @@ public class SchedulingController {
         return Map.of("dentists",db.queryForList("SELECT d.id,d.full_name FROM dentist d WHERE d.clinic_id=? AND d.active ORDER BY d.full_name",c),
           "chairs",db.queryForList("SELECT id,name FROM chair WHERE clinic_id=? AND branch_id=? AND active ORDER BY name",c,branchId));
     }
+    @GetMapping("/available-starts") @Transactional(readOnly=true)
+    public List<String> availableStarts(Authentication a,@RequestParam UUID branchId,@RequestParam UUID dentistId,
+            @RequestParam(required=false) UUID chairId,@RequestParam UUID appointmentTypeId,@RequestParam LocalDate date) {
+        UUID c=clinic(a);require(exists("branch",c,branchId)&&exists("dentist",c,dentistId),"Branch or dentist unavailable");
+        if(chairId!=null)require(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM chair WHERE clinic_id=? AND id=? AND branch_id=? AND active)",Boolean.class,c,chairId,branchId)),"Chair unavailable in branch");
+        List<Map<String,Object>> typeRows=db.queryForList("SELECT default_minutes,buffer_before_minutes,buffer_after_minutes FROM appointment_type WHERE clinic_id=? AND id=? AND active",c,appointmentTypeId);require(!typeRows.isEmpty(),"Appointment type unavailable");Map<String,Object> type=typeRows.get(0);int duration=((Number)type.get("default_minutes")).intValue(),before=((Number)type.get("buffer_before_minutes")).intValue(),after=((Number)type.get("buffer_after_minutes")).intValue();
+        if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM clinic_holiday WHERE clinic_id=? AND (branch_id IS NULL OR branch_id=?) AND starts_on<=? AND ends_on>=?)",Boolean.class,c,branchId,date,date)))return List.of();
+        ZoneId tz=zone(c);int weekday=date.getDayOfWeek().getValue();
+        List<Map<String,Object>> branchHours=db.queryForList("SELECT opens_at,closes_at FROM branch_operating_hour WHERE clinic_id=? AND branch_id=? AND day_of_week=?",c,branchId,weekday);
+        List<Map<String,Object>> dentistHours=db.queryForList("SELECT starts_at,ends_at FROM dentist_availability WHERE clinic_id=? AND branch_id=? AND dentist_id=? AND day_of_week=?",c,branchId,dentistId,weekday);
+        if(branchHours.isEmpty()||dentistHours.isEmpty())return List.of();
+        List<LocalTime[]> windows=new ArrayList<>();
+        for(Map<String,Object> branchHour:branchHours)for(Map<String,Object> dentistHour:dentistHours){LocalTime from=localTime(branchHour.get("opens_at")).isAfter(localTime(dentistHour.get("starts_at")))?localTime(branchHour.get("opens_at")):localTime(dentistHour.get("starts_at"));LocalTime to=localTime(branchHour.get("closes_at")).isBefore(localTime(dentistHour.get("ends_at")))?localTime(branchHour.get("closes_at")):localTime(dentistHour.get("ends_at"));if(from.isBefore(to))windows.add(new LocalTime[]{from,to});}
+        if(windows.isEmpty())return List.of();
+        Instant dayStart=date.atStartOfDay(tz).toInstant(),dayEnd=date.plusDays(1).atStartOfDay(tz).toInstant();
+        List<Instant[]> occupied=new ArrayList<>();
+        String appointmentSql="SELECT starts_at,ends_at FROM appointment WHERE clinic_id=? AND dentist_id=? AND starts_at<? AND ends_at>? AND status NOT IN ('CANCELLED','NO_SHOW')";
+        for(Map<String,Object> row:db.queryForList(appointmentSql,c,dentistId,ts(dayEnd.plusSeconds(after*60L)),ts(dayStart.minusSeconds(before*60L))))occupied.add(new Instant[]{instant(row.get("starts_at")),instant(row.get("ends_at"))});
+        if(chairId!=null){for(Map<String,Object> row:db.queryForList("SELECT starts_at,ends_at FROM appointment WHERE clinic_id=? AND chair_id=? AND starts_at<? AND ends_at>? AND status NOT IN ('CANCELLED','NO_SHOW')",c,chairId,ts(dayEnd.plusSeconds(after*60L)),ts(dayStart.minusSeconds(before*60L))))occupied.add(new Instant[]{instant(row.get("starts_at")),instant(row.get("ends_at"))});for(Map<String,Object> row:db.queryForList("SELECT starts_at,ends_at FROM chair_block WHERE clinic_id=? AND chair_id=? AND starts_at<? AND ends_at>?",c,chairId,ts(dayEnd),ts(dayStart)))occupied.add(new Instant[]{instant(row.get("starts_at")),instant(row.get("ends_at"))});}
+        for(Map<String,Object> row:db.queryForList("SELECT starts_at,ends_at FROM dentist_time_off WHERE clinic_id=? AND dentist_id=? AND starts_at<? AND ends_at>?",c,dentistId,ts(dayEnd),ts(dayStart)))occupied.add(new Instant[]{instant(row.get("starts_at")),instant(row.get("ends_at"))});
+        List<Map<String,Object>> policyResult=db.queryForList("SELECT minimum_notice_minutes,booking_horizon_days FROM scheduling_policy WHERE clinic_id=?",c);Map<String,Object> policyRows=policyResult.isEmpty()?Map.of("minimum_notice_minutes",0,"booking_horizon_days",180):policyResult.get(0);
+        Instant now=Instant.now(),earliest=now.plusSeconds(((Number)policyRows.get("minimum_notice_minutes")).longValue()*60L),latest=now.plusSeconds(((Number)policyRows.get("booking_horizon_days")).longValue()*86400L);
+        Set<LocalTime> result=new TreeSet<>();
+        for(LocalTime[] window:windows){for(LocalTime start=window[0];!start.plusMinutes(duration).isAfter(window[1]);start=start.plusMinutes(duration)){Instant candidate=start.atDate(date).atZone(tz).toInstant(),end=candidate.plusSeconds(duration*60L),guardStart=candidate.minusSeconds(before*60L),guardEnd=end.plusSeconds(after*60L);if(candidate.isBefore(earliest)||candidate.isAfter(latest))continue;boolean conflict=occupied.stream().anyMatch(range->guardStart.isBefore(range[1])&&guardEnd.isAfter(range[0]));if(!conflict)result.add(start);}}
+        return result.stream().map(t->String.format("%02d:%02d",t.getHour(),t.getMinute())).toList();
+    }
+    private static LocalTime localTime(Object value){if(value instanceof LocalTime t)return t;if(value instanceof java.sql.Time t)return t.toLocalTime();return LocalTime.parse(value.toString());}
+
+    // Branch closures. A null branch_id represents a clinic-wide holiday.
+    @GetMapping("/holidays") @Transactional(readOnly=true)
+    public List<Map<String,Object>> holidays(Authentication a,@RequestParam UUID branchId,
+            @RequestParam(required=false) LocalDate from,@RequestParam(required=false) LocalDate to) {
+        UUID c=clinic(a);require(exists("branch",c,branchId),"Unknown branch");
+        LocalDate first=from==null?LocalDate.now(zone(c)):from,last=to==null?first.plusYears(1):to;
+        require(!last.isBefore(first)&&Duration.between(first.atStartOfDay(),last.plusDays(1).atStartOfDay()).toDays()<=740,"Invalid holiday date range");
+        return db.queryForList("SELECT h.id,h.branch_id,b.name AS branch_name,h.starts_on,h.ends_on,h.name,h.note FROM clinic_holiday h LEFT JOIN branch b ON b.id=h.branch_id AND b.clinic_id=h.clinic_id WHERE h.clinic_id=? AND (h.branch_id IS NULL OR h.branch_id=?) AND h.starts_on<=? AND h.ends_on>=? ORDER BY h.starts_on,h.name",c,branchId,last,first);
+    }
+    @PostMapping("/holidays") @ResponseStatus(HttpStatus.CREATED) @Transactional
+    public Map<String,Object> createHoliday(Authentication a,@RequestBody HolidayInput in) {
+        UUID c=manager(a).clinicId();validateHoliday(c,in);UUID id=UUID.randomUUID();
+        db.update("INSERT INTO clinic_holiday(id,clinic_id,branch_id,starts_on,ends_on,name,note) VALUES(?,?,?,?,?,?,?)",id,c,in.branchId(),in.startsOn(),in.endsOn(),in.name().trim(),cleanNote(in.note()));
+        return holiday(c,id);
+    }
+    @PutMapping("/holidays/{id}") @Transactional
+    public Map<String,Object> updateHoliday(Authentication a,@PathVariable UUID id,@RequestBody HolidayInput in) {
+        UUID c=manager(a).clinicId();require(exists("clinic_holiday",c,id),"Holiday not found");validateHoliday(c,in);
+        db.update("UPDATE clinic_holiday SET branch_id=?,starts_on=?,ends_on=?,name=?,note=?,updated_at=now() WHERE clinic_id=? AND id=?",in.branchId(),in.startsOn(),in.endsOn(),in.name().trim(),cleanNote(in.note()),c,id);
+        return holiday(c,id);
+    }
+    @DeleteMapping("/holidays/{id}") @ResponseStatus(HttpStatus.NO_CONTENT) @Transactional
+    public void deleteHoliday(Authentication a,@PathVariable UUID id) {
+        int deleted=db.update("DELETE FROM clinic_holiday WHERE clinic_id=? AND id=?",manager(a).clinicId(),id);
+        if(deleted==0)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Holiday not found");
+    }
+    private void validateHoliday(UUID clinic,HolidayInput in) {
+        require(in.startsOn()!=null&&in.endsOn()!=null&&!in.endsOn().isBefore(in.startsOn())&&Duration.between(in.startsOn().atStartOfDay(),in.endsOn().plusDays(1).atStartOfDay()).toDays()<=366,"Holiday must have a valid date range of at most one year");
+        require(in.name()!=null&&!in.name().isBlank()&&in.name().trim().length()<=120,"Holiday name is required and must be at most 120 characters");
+        require(in.note()==null||in.note().length()<=500,"Holiday note must be at most 500 characters");
+        if(in.branchId()!=null)require(exists("branch",clinic,in.branchId()),"Unknown branch");
+    }
+    private static String cleanNote(String value){return value==null||value.isBlank()?null:value.trim();}
+    private Map<String,Object> holiday(UUID clinic,UUID id){return db.queryForMap("SELECT h.id,h.branch_id,b.name AS branch_name,h.starts_on,h.ends_on,h.name,h.note FROM clinic_holiday h LEFT JOIN branch b ON b.id=h.branch_id AND b.clinic_id=h.clinic_id WHERE h.clinic_id=? AND h.id=?",clinic,id);}
     @GetMapping("/calendar") @Transactional(readOnly=true)
     public List<Map<String,Object>> calendar(Authentication a,@RequestParam UUID branchId,@RequestParam Instant from,@RequestParam Instant to) {
         UUID c=clinic(a);require(from!=null&&to!=null&&to.isAfter(from)&&Duration.between(from,to).toDays()<=32,"Invalid calendar range");
-        return db.queryForList("SELECT a.id,a.branch_id,a.patient_id,p.first_name,p.last_name,a.dentist_id,d.full_name AS dentist_name,a.chair_id,a.appointment_type_id,a.starts_at,a.ends_at,a.status,a.reason,a.version FROM appointment a JOIN patient p ON p.id=a.patient_id AND p.clinic_id=a.clinic_id JOIN dentist d ON d.id=a.dentist_id AND d.clinic_id=a.clinic_id WHERE a.clinic_id=? AND a.branch_id=? AND a.starts_at<? AND a.ends_at>? ORDER BY a.starts_at,a.id",c,branchId,ts(to),ts(from));
+        return db.queryForList("SELECT a.id,a.branch_id,a.patient_id,p.first_name,p.last_name,a.dentist_id,d.full_name AS dentist_name,a.chair_id,a.appointment_type_id,t.name AS appointment_type_name,a.starts_at,a.ends_at,a.status,a.reason,a.version FROM appointment a JOIN patient p ON p.id=a.patient_id AND p.clinic_id=a.clinic_id JOIN dentist d ON d.id=a.dentist_id AND d.clinic_id=a.clinic_id LEFT JOIN appointment_type t ON t.id=a.appointment_type_id AND t.clinic_id=a.clinic_id WHERE a.clinic_id=? AND a.branch_id=? AND a.starts_at<? AND a.ends_at>? ORDER BY a.starts_at,a.id",c,branchId,ts(to),ts(from));
     }
     @PostMapping("/appointments") @ResponseStatus(HttpStatus.CREATED) @Transactional
     public Map<String,Object> book(Authentication a,@RequestBody BookingInput in) {

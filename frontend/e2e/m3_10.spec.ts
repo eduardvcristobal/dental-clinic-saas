@@ -22,13 +22,13 @@ const appointmentRow = {
   first_name: patient.first_name, last_name: patient.last_name,
   dentist_id: dentistAda.id, dentist_name: 'Dr. Ada',
   chair_id: chair.id, appointment_type_id: null,
-  starts_at: '2026-10-26T02:00:00.000Z', ends_at: '2026-10-26T02:30:00.000Z',
+  starts_at: '2026-10-19T02:00:00.000Z', ends_at: '2026-10-19T02:30:00.000Z',
   status: 'BOOKED', reason: 'Synthetic checkup', version: 0,
 }
 const secondRow = {
   ...appointmentRow, id: '66666666-6666-4666-8666-666666662222',
   dentist_id: dentistAbel.id, dentist_name: 'Dr. Abel', chair_id: null,
-  starts_at: '2026-10-26T03:00:00.000Z', ends_at: '2026-10-26T03:30:00.000Z', status: 'CONFIRMED',
+  starts_at: '2026-10-19T03:00:00.000Z', ends_at: '2026-10-19T03:30:00.000Z', status: 'CONFIRMED',
 }
 
 const backendOnly = (url: URL) => url.pathname.startsWith('/api/')
@@ -86,21 +86,21 @@ test('calendar API failure surfaces a status message and loading state', async (
   await expect(page.getByText(/synthetic|500/i).first()).toBeVisible()
 })
 
-test('appointment details panel shows lifecycle history and close button', async ({ page }) => {
-  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'Cancel' }).click()
-  const details = page.getByTestId('appointment-details')
-  await expect(details).toBeVisible()
-  await expect(details.getByRole('heading', { name: 'Lifecycle history' })).toBeVisible()
-  await expect(details.locator('li')).toHaveCount(1)
-  await details.getByRole('button', { name: 'Close details' }).click()
-  await expect(details).not.toBeVisible()
+test('appointment actions dialog lists remaining lifecycle actions and closes', async ({ page }) => {
+  // Lifecycle actions moved into an overflow dialog; the primary action stays inline.
+  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'More appointment actions' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: 'No show', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Close appointment actions' }).click()
+  await expect(dialog).not.toBeVisible()
 })
 
 test('cancelling an appointment announces the outcome in a toast', async ({ page }) => {
-  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'Cancel' }).click()
-  const details = page.getByTestId('appointment-details')
-  await expect(details).toBeVisible()
-  await details.getByRole('button', { name: 'Cancel appointment' }).click()
+  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'More appointment actions' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Cancel appointment?' })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel appointment', exact: true }).click()
   const notifications = page.getByRole('region', { name: 'Notifications' })
   await expect(notifications.getByText('Appointment cancelled')).toBeVisible()
   await notifications.getByRole('button', { name: 'Dismiss notification' }).click()
@@ -113,10 +113,9 @@ test('a failed appointment update announces the error in a toast', async ({ page
     if (path.endsWith('/status')) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'Synthetic failure' }) })
     return route.fallback()
   })
-  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'Cancel' }).click()
-  const details = page.getByTestId('appointment-details')
-  await expect(details).toBeVisible()
-  await details.getByRole('button', { name: 'Cancel appointment' }).click()
+  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'More appointment actions' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel appointment', exact: true }).click()
   const notifications = page.getByRole('region', { name: 'Notifications' })
   const failure = notifications.getByText('Synthetic failure')
   await expect(failure).toBeVisible()
@@ -147,7 +146,8 @@ test('book appointment dropdowns list their options and keep the chosen value', 
   await expect(chair).toHaveText('Chair 1')
 
   const type = page.getByTestId('booking-type')
-  await expect(type).toHaveText('Standard (30 min)')
+  // Appointment types are required now; without a choice the trigger shows its placeholder.
+  await expect(type).toHaveText('Select appointment type')
   await type.click()
   await page.getByRole('listbox', { name: 'Appointment type' }).getByRole('option', { name: /Checkup/ }).click()
   await expect(type).toHaveText('Checkup')
