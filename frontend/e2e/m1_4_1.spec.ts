@@ -314,10 +314,10 @@ test('command center day board lays the clinic day out as resource lanes', async
   await expect(board.locator('.ws-chips button').filter({ hasText: 'Synthetic Main Branch' })).toBeVisible()
 
   // Blocks carry the clinic-local time, the visit and the provider in their accessible name.
-  const checkup = board.getByRole('link', { name: /09:00 to 09:30, Checkup, Ana Reyes/ })
+  const checkup = board.getByRole('button', { name: /09:00 to 09:30, Checkup, Ana Reyes/ })
   await expect(checkup).toBeVisible()
-  await expect(board.getByRole('link', { name: /10:00 to 11:00, Scaling, Ben Santos/ })).toBeVisible()
-  await expect(board.getByRole('link', { name: /09:30 to 10:00, Filling, Cara Dela Cruz/ })).toBeVisible()
+  await expect(board.getByRole('button', { name: /10:00 to 11:00, Scaling, Ben Santos/ })).toBeVisible()
+  await expect(board.getByRole('button', { name: /09:30 to 10:00, Filling, Cara Dela Cruz/ })).toBeVisible()
 
   // A longer visit is drawn wider than a shorter one on the same lane.
   const width = async (name: RegExp) => Number((await board.getByRole('link', { name }).evaluate(node => node.style.width)).replace('%', ''))
@@ -341,12 +341,16 @@ test('command center day board lays the clinic day out as resource lanes', async
   await board.getByRole('button', { name: 'List' }).click()
   await expect(board.getByRole('cell', { name: 'Ana Reyes' })).toBeVisible()
   await board.getByRole('button', { name: 'Timeline' }).click()
-  await expect(board.getByRole('link', { name: /09:00 to 09:30, Checkup/ })).toBeVisible()
+  await expect(board.getByRole('button', { name: /09:00 to 09:30, Checkup/ })).toBeVisible()
 
-  // Blocks drill through to the calendar instead of editing the visit here.
+  // Appointment blocks open a details dialog without navigating away from the day board.
   await page.screenshot({ path: resolve(screenshotDir, 'desktop-command-center-day-board.png'), fullPage: true })
   await checkup.click()
-  await expect(page).toHaveURL(/\/workspace\/calendar\?appointment=appointment-1/)
+  const appointmentDetails = page.getByRole('dialog', { name: 'Ana Reyes' })
+  await expect(appointmentDetails).toBeVisible()
+  await expect(appointmentDetails).toContainText('Checkup')
+  await expect(page).toHaveURL(/\/workspace\/command-center$/)
+  await page.getByRole('button', { name: 'Close appointment details' }).click()
 
   const dimensions = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }))
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport + 1)
@@ -373,8 +377,8 @@ test('calendar day board tab reviews other dates through the scheduling filters'
   const board = page.getByRole('region', { name: 'Clinic day board' })
   await expect(board.locator('.ws-dayboard-heading p').filter({ hasText: 'Wednesday, October 21' })).toBeVisible()
   await expect(board.locator('.ws-dayboard-lane-label').filter({ hasText: 'Synthetic Chair 1' })).toBeVisible()
-  // The active branch comes from the workspace header instead of the board chips.
-  await expect(board.locator('.ws-chips-lock').filter({ hasText: 'Synthetic Main Branch' })).toBeVisible()
+  // Branch selection can be displayed as an interactive chip or a locked label.
+  await expect(board.getByRole('group', { name: 'Branch filter' }).getByText('Synthetic Main Branch')).toBeVisible()
 
   // The scheduling filters drive the board: stepping a day refetches that clinic-local date.
   await expect.poll(() => boardRequests.some(query => query.includes('date=2026-10-21'))).toBe(true)
