@@ -4,6 +4,7 @@ export interface BoardBranch { id: string; name: string; opens_at: string | null
 export interface BoardLane { id: string; kind: LaneKind; name: string; branch_id: string | null; color: string | null }
 export interface BoardBlock {
   id: string; starts_at: string; ends_at: string; status: string; branch_id: string
+  reason?: string | null
   patient_name: string; activity: string; type_color: string | null
   dentist_id: string; dentist_name: string; dentist_color: string | null
   chair_id: string | null; chair_name: string
@@ -16,8 +17,6 @@ export interface BoardPayload {
 
 const MINUTES_PER_DAY = 1440
 const MIN_WINDOW_MINUTES = 8 * 60
-
-const FALLBACK_COLORS = ['#0e7c86', '#2f6fed', '#8b5cf6', '#c2750a', '#c0367a', '#0f8a5f', '#c0362f', '#4f46e5']
 
 export type StatusTone = 'booked' | 'confirmed' | 'arrived' | 'in-chair' | 'completed' | 'cancelled' | 'no-show'
 
@@ -263,13 +262,19 @@ export function upcomingBlocks(blocks: BoardBlock[], nowMinutes: number, timezon
     .map(entry => entry.block)
 }
 
-/** Appointment type colour when set, otherwise a stable colour derived from the visit name. */
+const STATUS_COLORS: Record<StatusTone, string> = {
+  booked: '#3b82f6', confirmed: '#7c3aed', arrived: '#d97706', 'in-chair': '#0891b2',
+  completed: '#16865a', cancelled: '#64748b', 'no-show': '#c0444b',
+}
+
+/** Consistent status color for appointment blocks and the board legend. */
+export function statusColor(tone: StatusTone): string {
+  return STATUS_COLORS[tone]
+}
+
+/** Block color follows its lifecycle status, rather than the appointment type. */
 export function blockColor(block: BoardBlock): string {
-  const declared = (block.type_color ?? '').trim()
-  if (/^#[0-9a-f]{3,8}$/i.test(declared)) return declared
-  let hash = 0
-  for (const character of block.activity) hash = (hash * 31 + character.charCodeAt(0)) >>> 0
-  return FALLBACK_COLORS[hash % FALLBACK_COLORS.length]
+  return statusColor(statusTone(block.status))
 }
 
 /** Axis tick marks in minutes for the shared time axis. */

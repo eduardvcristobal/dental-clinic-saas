@@ -129,7 +129,7 @@ public class WorkspaceDashboardController {
         String blockClause = "";
         if (branchId != null) { blockClause = " AND a.branch_id=?"; blockArgs.add(branchId); }
         List<Map<String,Object>> blocks = db.queryForList("""
-            SELECT a.id, a.starts_at, a.ends_at, a.status, a.branch_id,
+            SELECT a.id, a.starts_at, a.ends_at, a.status, a.branch_id, a.reason,
                    p.first_name || ' ' || p.last_name AS patient_name,
                    coalesce(t.name, a.reason, 'Appointment') AS activity,
                    t.color AS type_color,
