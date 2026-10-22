@@ -27,8 +27,8 @@ export function InvitationAcceptancePage() {
     <h1>Join your dental clinic</h1>
     {accepted ? <p role="status">Invitation accepted. <Link to="/login">Sign in to your clinic</Link>.</p> : <>
       <p className="muted">Use the Google account matching the invited email. Invitations expire and can only be used once.</p>
-      <label className="field">Invitation token<input type="password" required autoComplete="off" value={token} onChange={e=>setToken(e.target.value)}/></label>
-      <label className="field">Your full name<input required value={fullName} onChange={e=>setFullName(e.target.value)}/></label>
+      <label className="field">Invitation token<input type="password" required autoComplete="off" value={token} placeholder="Paste your private invitation token" onChange={e=>setToken(e.target.value)}/></label>
+      <label className="field">Your full name<input required value={fullName} placeholder="Enter your full name" onChange={e=>setFullName(e.target.value)}/></label>
       {error && <p role="alert" className="error">{error}</p>}
       {token && fullName && !busy && <GoogleCredentialButton onSuccess={r=>void accept(r.credential)} onError={()=>setError('Google verification failed')}/>}
     </>}

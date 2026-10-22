@@ -2,10 +2,21 @@ package com.dentalapp.patient;
 
 import com.dentalapp.auth.AuthPrincipal;
 import com.dentalapp.service.NumberingService;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.Base64;
+import javax.imageio.IIOImage;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,6 +38,10 @@ public class PatientController {
                                String emergencyPhone, Boolean smsOptIn, Long version) {
         @Override public String toString() { return "PatientInput[demographics=[REDACTED], contact=[REDACTED], emergency=[REDACTED], version=" + version + "]"; }
     }
+    public record PhotoInput(String dataUrl) {
+        @Override public String toString() { return "PhotoInput[dataUrl=[REDACTED]]"; }
+    }
+    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     private AuthPrincipal staff(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthPrincipal p))
@@ -44,14 +59,18 @@ public class PatientController {
         return s.strip();
     }
     private void validate(PatientInput p) {
+        if (p == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Patient details are required");
         required(p.firstName(),"first name",120);
         required(p.lastName(),"last name",120);
         if (p.birthDate()!=null && p.birthDate().isAfter(LocalDate.now()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Birth date cannot be in the future");
         if (p.sex()!=null && !p.sex().isBlank() && !List.of("FEMALE","MALE","OTHER","UNDISCLOSED").contains(p.sex()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unsupported sex value");
-        optional(p.phone(),80); optional(p.email(),254); optional(p.address(),2000);
-        optional(p.emergencyName(),160); optional(p.emergencyPhone(),80);
+        optional(p.phone(),80);
+        String email=optional(p.email(),254);
+        if(email!=null && !EMAIL.matcher(email).matches())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Enter a valid email address");
+        optional(p.address(),2000); optional(p.emergencyName(),160); optional(p.emergencyPhone(),80);
     }
     private static final String COLUMNS = "id,chart_no,first_name,last_name,birth_date,sex,phone,email,address,emergency_name,emergency_phone,sms_opt_in,created_at,updated_at,version";
     @GetMapping @Transactional(readOnly=true)
@@ -63,17 +82,101 @@ public class PatientController {
         String text="%"+q.strip().replace("\\","\\\\").replace("%","\\%").replace("_","\\_")+"%";
         return db.queryForList("SELECT "+COLUMNS+" FROM patient WHERE clinic_id=? AND deleted_at IS NULL AND (chart_no ILIKE ? ESCAPE '\\' OR first_name ILIKE ? ESCAPE '\\' OR last_name ILIKE ? ESCAPE '\\' OR concat_ws(' ',first_name,last_name) ILIKE ? ESCAPE '\\' OR phone ILIKE ? ESCAPE '\\') ORDER BY last_name,first_name,id LIMIT ? OFFSET ?",clinic,text,text,text,text,text,limit,offset);
     }
+    @GetMapping("/count") @Transactional(readOnly=true)
+    public Map<String,Long> count(Authentication auth,@RequestParam(defaultValue="") String q) {
+        UUID clinic=staff(auth).clinicId();
+        if(q.length()>120) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid search");
+        String text="%"+q.strip().replace("\\","\\\\").replace("%","\\%").replace("_","\\_")+"%";
+        Long total=db.queryForObject("SELECT count(*) FROM patient WHERE clinic_id=? AND deleted_at IS NULL AND (chart_no ILIKE ? ESCAPE '\\' OR first_name ILIKE ? ESCAPE '\\' OR last_name ILIKE ? ESCAPE '\\' OR concat_ws(' ',first_name,last_name) ILIKE ? ESCAPE '\\' OR phone ILIKE ? ESCAPE '\\')",Long.class,clinic,text,text,text,text,text);
+        return Map.of("count",total==null?0L:total);
+    }
     @GetMapping("/{id}") @Transactional(readOnly=true)
     public Map<String,Object> get(Authentication auth,@PathVariable UUID id) {
         List<Map<String,Object>> rows=db.queryForList("SELECT "+COLUMNS+" FROM patient WHERE id=? AND clinic_id=? AND deleted_at IS NULL",id,staff(auth).clinicId());
         if(rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Patient not found");
         return rows.get(0);
     }
+    @GetMapping("/{id}/photo") @Transactional(readOnly=true)
+    public Map<String,String> getPhoto(Authentication auth,@PathVariable UUID id) {
+        UUID clinic=staff(auth).clinicId();
+        get(auth,id);
+        List<Map<String,Object>> rows=db.queryForList("SELECT image_data FROM patient_profile_photo WHERE clinic_id=? AND patient_id=?",clinic,id);
+        if(rows.isEmpty()) return Map.of("dataUrl","");
+        byte[] image=(byte[])rows.get(0).get("image_data");
+        String mime=image.length>1&&image[0]==(byte)0xFF&&image[1]==(byte)0xD8?"image/jpeg":"image/png";
+        return Map.of("dataUrl","data:"+mime+";base64,"+Base64.getEncoder().encodeToString(image));
+    }
+    @PutMapping("/{id}/photo") @Transactional
+    public Map<String,String> putPhoto(Authentication auth,@PathVariable UUID id,@RequestBody PhotoInput input) {
+        AuthPrincipal user=staff(auth);UUID clinic=user.clinicId();get(auth,id);
+        byte[] image=normalizePhoto(input);
+        db.update("INSERT INTO patient_profile_photo(clinic_id,patient_id,image_data,updated_by,updated_at) VALUES (?,?,?,?,now()) ON CONFLICT (clinic_id,patient_id) DO UPDATE SET image_data=excluded.image_data,updated_by=excluded.updated_by,updated_at=now()",clinic,id,image,user.userId());
+        audit(clinic,user.userId(),"PATIENT_PHOTO_UPDATED",id);
+        return Map.of("dataUrl","data:image/jpeg;base64,"+Base64.getEncoder().encodeToString(image));
+    }
+    @DeleteMapping("/{id}/photo") @ResponseStatus(HttpStatus.NO_CONTENT) @Transactional
+    public void deletePhoto(Authentication auth,@PathVariable UUID id) {
+        AuthPrincipal user=staff(auth);get(auth,id);
+        db.update("DELETE FROM patient_profile_photo WHERE clinic_id=? AND patient_id=?",user.clinicId(),id);
+        audit(user.clinicId(),user.userId(),"PATIENT_PHOTO_REMOVED",id);
+    }
+    private static byte[] normalizePhoto(PhotoInput input) {
+        if(input==null||input.dataUrl()==null||input.dataUrl().length()>150_000)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Resized patient photos must be smaller than 100 KB");
+        String data=input.dataUrl();
+        if(!data.startsWith("data:image/jpeg;base64,"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Upload a resized JPEG image");
+        byte[] source;
+        try { source=Base64.getDecoder().decode(data.substring(data.indexOf(',')+1)); }
+        catch(IllegalArgumentException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"The image file could not be read"); }
+        if(source.length==0||source.length>102_400)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Resized patient photos must be smaller than 100 KB");
+        try(ByteArrayInputStream bytes=new ByteArrayInputStream(source);ImageInputStream stream=ImageIO.createImageInputStream(bytes)) {
+            if(stream==null) throw new IllegalArgumentException();
+            var readers=ImageIO.getImageReaders(stream);
+            if(!readers.hasNext()) throw new IllegalArgumentException();
+            ImageReader reader=readers.next();
+            try {
+                reader.setInput(stream,true,true);
+                int width=reader.getWidth(0),height=reader.getHeight(0);
+                if(width<1||height<1||width>4096||height>4096||(long)width*height>16_000_000)
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Image dimensions must be 4096 × 4096 pixels or smaller");
+                BufferedImage decoded=reader.read(0);
+                if(decoded==null) throw new IllegalArgumentException();
+                return encodeJpegUnderLimit(decoded);
+            } finally { reader.dispose(); }
+        } catch(ResponseStatusException e) { throw e; }
+        catch(Exception e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Upload a valid JPEG image"); }
+    }
+    private static byte[] encodeJpegUnderLimit(BufferedImage source) throws Exception {
+        double scale=Math.min(1d,512d/Math.max(source.getWidth(),source.getHeight()));
+        for(int resize=0;resize<10;resize++,scale*=.8d) {
+            int width=Math.max(48,(int)Math.round(source.getWidth()*scale));
+            int height=Math.max(48,(int)Math.round(source.getHeight()*scale));
+            BufferedImage rgb=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);
+            var graphics=rgb.createGraphics();
+            try { graphics.setColor(java.awt.Color.WHITE);graphics.fillRect(0,0,width,height);graphics.drawImage(source,0,0,width,height,null); }
+            finally { graphics.dispose(); }
+            for(float quality:new float[]{.86f,.76f,.66f,.56f,.46f,.36f}) {
+                ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+                var writers=ImageIO.getImageWritersByFormatName("jpeg");
+                if(!writers.hasNext()) throw new IllegalStateException("JPEG encoder unavailable");
+                var writer=writers.next();
+                try(MemoryCacheImageOutputStream output=new MemoryCacheImageOutputStream(bytes)) {
+                    ImageWriteParam params=writer.getDefaultWriteParam();
+                    params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);params.setCompressionQuality(quality);
+                    writer.setOutput(output);writer.write(null,new IIOImage(rgb,null,null),params);output.flush();
+                } finally { writer.dispose(); }
+                if(bytes.size()<102_400)return bytes.toByteArray();
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Could not resize this photo below 100 KB");
+    }
     @GetMapping("/duplicate-candidates") @Transactional(readOnly=true)
     public List<Map<String,Object>> duplicates(Authentication auth,@RequestParam String firstName,@RequestParam String lastName,@RequestParam LocalDate birthDate) {
         UUID clinic=staff(auth).clinicId();
         String first=required(firstName,"first name",120),last=required(lastName,"last name",120);
-        return db.queryForList("SELECT id,chart_no,first_name,last_name,birth_date FROM patient WHERE clinic_id=? AND deleted_at IS NULL AND lower(first_name)=lower(?) AND lower(last_name)=lower(?) AND birth_date=? ORDER BY created_at LIMIT 20",clinic,first,last,birthDate);
+        return db.queryForList("SELECT id,chart_no,first_name,last_name,birth_date FROM patient WHERE clinic_id=? AND deleted_at IS NULL AND lower(trim(first_name))=lower(trim(?)) AND lower(trim(last_name))=lower(trim(?)) AND birth_date=? ORDER BY created_at LIMIT 20",clinic,first,last,birthDate);
     }
     @PostMapping @ResponseStatus(HttpStatus.CREATED) @Transactional
     public Map<String,Object> create(Authentication auth,@RequestBody PatientInput input) {

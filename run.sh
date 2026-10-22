@@ -7,6 +7,7 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 ENV_FILE="$BACKEND_DIR/.env.local"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+BACKEND_STARTUP_TIMEOUT="${BACKEND_STARTUP_TIMEOUT:-120}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   cat >&2 <<EOF
@@ -20,10 +21,14 @@ fi
 
 # The private local env file is shell syntax, so values with special characters
 # can be quoted normally. It is ignored by git.
+ALLOW_SEED_OVERRIDE="${ALLOW_SEED:-}"
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
+if [[ -n "$ALLOW_SEED_OVERRIDE" ]]; then
+  ALLOW_SEED="$ALLOW_SEED_OVERRIDE"
+fi
 
 required_vars=(DB_URL DB_APP_USER DB_APP_PASSWORD DB_OWNER_USER DB_OWNER_PASSWORD GOOGLE_CLIENT_ID APP_JWT_SECRET APP_ALLOWED_ORIGINS)
 missing_vars=()
@@ -43,7 +48,7 @@ fi
 
 export APP_COOKIE_SECURE="${APP_COOKIE_SECURE:-false}"
 export APP_ALLOWED_ORIGINS="${APP_ALLOWED_ORIGINS:-http://localhost:5173}"
-export DB_URL DB_APP_USER DB_APP_PASSWORD DB_OWNER_USER DB_OWNER_PASSWORD GOOGLE_CLIENT_ID APP_JWT_SECRET
+export DB_URL DB_APP_USER DB_APP_PASSWORD DB_OWNER_USER DB_OWNER_PASSWORD GOOGLE_CLIENT_ID APP_JWT_SECRET ALLOW_SEED
 
 if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
   echo "Frontend dependencies are missing. Run 'npm ci' in $FRONTEND_DIR first." >&2
@@ -51,6 +56,10 @@ if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
 fi
 if ! command -v mvn >/dev/null 2>&1; then
   echo "Maven is required to start the backend." >&2
+  exit 1
+fi
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required to check backend startup." >&2
   exit 1
 fi
 
@@ -90,6 +99,27 @@ trap cleanup EXIT INT TERM
 echo "Starting backend on http://localhost:$BACKEND_PORT"
 (cd "$BACKEND_DIR" && mvn -q spring-boot:run -Dspring-boot.run.arguments="--server.port=$BACKEND_PORT") &
 backend_pid=$!
+
+echo "Waiting for backend to accept HTTP requests (up to ${BACKEND_STARTUP_TIMEOUT}s)..."
+backend_ready=false
+for ((elapsed=0; elapsed<BACKEND_STARTUP_TIMEOUT; elapsed++)); do
+  if ! kill -0 "$backend_pid" 2>/dev/null; then
+    echo "Backend exited before it became ready. See the backend startup output above." >&2
+    exit 1
+  fi
+  http_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 2 "http://127.0.0.1:$BACKEND_PORT/api/auth/refresh" || true)"
+  if [[ "$http_status" =~ ^[1-5][0-9][0-9]$ ]]; then
+    backend_ready=true
+    break
+  fi
+  sleep 1
+done
+
+if [[ "$backend_ready" != true ]]; then
+  echo "Backend did not become ready within ${BACKEND_STARTUP_TIMEOUT}s; frontend was not started." >&2
+  exit 1
+fi
+echo "Backend is ready."
 
 echo "Starting frontend on http://localhost:$FRONTEND_PORT"
 (cd "$FRONTEND_DIR" && npm run dev -- --host 127.0.0.1 --port "$FRONTEND_PORT" --strictPort) &

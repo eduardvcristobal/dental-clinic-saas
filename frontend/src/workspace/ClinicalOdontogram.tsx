@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { teethFor, surfaceOptions } from './odontogram'
+import { Dropdown } from './Dropdown'
+import { useToast } from './toastContext'
+import { describeError } from './toast'
 
 type Event = {id:string;tooth_number:number;surface:string|null;condition_code:string;event_kind:string;clinical_status:string;notes:string|null;recorded_at:string;supersedes_event_id:string|null}
 type Chart = {patientId:string;chartId:string|null;events:Event[]}
@@ -15,6 +18,7 @@ export function Odontogram({patientId}:{patientId:string}) {
  const [notes,setNotes]=useState('')
  const [supersedes,setSupersedes]=useState<string|null>(null)
  const [error,setError]=useState('')
+ const toast=useToast()
  const [saving,setSaving]=useState(false)
  const [loading,setLoading]=useState(true)
  useEffect(()=>{
@@ -36,13 +40,14 @@ export function Odontogram({patientId}:{patientId:string}) {
      })
      const fresh=await api<Chart>(`/api/odontogram/patients/${encodeURIComponent(patientId)}`)
      setChart(fresh);setSupersedes(null);setNotes('')
-   } catch(e) {setError(e instanceof Error?e.message:'Could not record finding')}
+     toast.success(kind==='OBSERVATION'?'Finding recorded':kind==='CORRECTION'?'Correction recorded':'Finding retracted')
+   } catch(e) {toast.error(describeError(e,'Could not record finding'))}
    finally {setSaving(false)}
  }
  return <section className="ws-panel ws-management" aria-label="Clinical odontogram">
    <h3>Odontogram — clinical record</h3>
    <p>FDI tooth notation · observations are retained as immutable events. Correct past entries by adding a new event.</p>
-   <label>Dentition <select value={dentition} onChange={e=>{const d=e.target.value as 'permanent'|'primary'|'mixed';setDentition(d);setTooth(d==='permanent'?11:51);setSurface('WHOLE');setSupersedes(null)}}><option value="permanent">Permanent teeth</option><option value="primary">Primary teeth</option><option value="mixed">Mixed dentition</option></select></label>
+   <Dropdown label="Dentition" value={dentition} options={[{value:'permanent',label:'Permanent teeth'},{value:'primary',label:'Primary teeth'},{value:'mixed',label:'Mixed dentition'}]} onChange={v=>{const d=v as 'permanent'|'primary'|'mixed';setDentition(d);setTooth(d==='permanent'?11:51);setSurface('WHOLE');setSupersedes(null)}}/>
    <div role="group" aria-label="Select tooth" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(44px,1fr))',gap:7,margin:'18px 0'}}>
      {teethFor(dentition).map(n=><button key={n} type="button" onClick={()=>{setTooth(n);setSurface('WHOLE');setSupersedes(null)}} aria-pressed={tooth===n} style={{border:tooth===n?'2px solid #267d68':'1px solid #a8b2bd',borderRadius:8,padding:'12px 4px',fontWeight:tooth===n?700:400,background:tooth===n?'#d6efe4':'transparent',color:'inherit'}}>{n}{active.some(x=>x.tooth_number===n)?' •':''}</button>)}
    </div>
@@ -51,9 +56,9 @@ export function Odontogram({patientId}:{patientId:string}) {
    {!loading&&chart&&<div className="ws-columns">
      <div>
        <h4>Record tooth {tooth}</h4>
-       <label>Surface <select value={surface} onChange={e=>setSurface(e.target.value)}>{surfaceOptions(tooth).map(s=><option key={s} value={s}>{s==='WHOLE'?'Whole tooth':s}</option>)}</select></label>
-       <label>Finding <select value={condition} onChange={e=>setCondition(e.target.value)}>{conditions.map(c=><option key={c}>{c}</option>)}</select></label>
-       <label>Clinical status <select value={status} onChange={e=>setStatus(e.target.value)}>{['EXISTING','PLANNED','COMPLETED'].map(s=><option key={s}>{s}</option>)}</select></label>
+        <Dropdown label="Surface" value={surface} options={surfaceOptions(tooth).map(s=>({value:s,label:s==='WHOLE'?'Whole tooth':s}))} onChange={setSurface}/>
+        <Dropdown label="Finding" value={condition} options={conditions.map(c=>({value:c,label:c}))} onChange={setCondition}/>
+        <Dropdown label="Clinical status" value={status} options={['EXISTING','PLANNED','COMPLETED'].map(s=>({value:s,label:s}))} onChange={setStatus}/>
        <label>Notes <textarea value={notes} onChange={e=>setNotes(e.target.value)} maxLength={10000} rows={3}/></label>
        <button type="button" disabled={saving} onClick={()=>void save('OBSERVATION')}>Record new finding</button>
        {supersedes&&<><button type="button" disabled={saving} onClick={()=>void save('CORRECTION')}>Record correction</button> <button type="button" disabled={saving} onClick={()=>void save('RETRACTION')}>Retract finding</button></>}

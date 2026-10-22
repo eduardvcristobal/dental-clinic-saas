@@ -53,6 +53,16 @@ mvn -Dtest=AuthIntegrationTest test
 
 Frontend API client checks run with `cd frontend && npm ci && npm test && npm run build && npm run lint`.
 
+## Local synthetic data
+
+The workspace Command Center reads clinic-scoped database records; it does not use sample names or fixed dashboard totals. To show the patient seed control during local testing, start the app with:
+
+```sh
+ALLOW_SEED=true ./run.sh
+```
+
+The control is available to clinic owners and administrators across workspace pages. It adds 1–100 synthetic patient records per click, marked with `Seed` names and `.invalid` email addresses, with SMS opt-in disabled. The backend rejects seeding unless `ALLOW_SEED=true`; the default is false. Keep it off outside local/test environments.
+
 ## Tenancy and authentication
 
 Hibernate `@TenantId` scopes tenant entities. `TenantFilter` obtains tenant identity only from the verified JWT principal. PostgreSQL RLS provides a second fail-closed layer through `app.clinic_id`, stamped/reset at connection checkout/return. Background tasks must wrap tenant work with `TenantContext.runAs` or `TenantContext.callAs`.

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { dropdownText, pickDropdown } from './dropdown'
 
 /** M3.10 mocked browser regression for the scheduling calendar. Every network call is intercepted;
  * no request reaches a real backend. Complements the live-backend E2E in m3_10_live.spec.ts. */
@@ -21,13 +22,13 @@ const appointmentRow = {
   first_name: patient.first_name, last_name: patient.last_name,
   dentist_id: dentistAda.id, dentist_name: 'Dr. Ada',
   chair_id: chair.id, appointment_type_id: null,
-  starts_at: '2026-10-26T02:00:00.000Z', ends_at: '2026-10-26T02:30:00.000Z',
+  starts_at: '2026-10-19T02:00:00.000Z', ends_at: '2026-10-19T02:30:00.000Z',
   status: 'BOOKED', reason: 'Synthetic checkup', version: 0,
 }
 const secondRow = {
   ...appointmentRow, id: '66666666-6666-4666-8666-666666662222',
   dentist_id: dentistAbel.id, dentist_name: 'Dr. Abel', chair_id: null,
-  starts_at: '2026-10-26T03:00:00.000Z', ends_at: '2026-10-26T03:30:00.000Z', status: 'CONFIRMED',
+  starts_at: '2026-10-19T03:00:00.000Z', ends_at: '2026-10-19T03:30:00.000Z', status: 'CONFIRMED',
 }
 
 const backendOnly = (url: URL) => url.pathname.startsWith('/api/')
@@ -57,12 +58,12 @@ test.beforeEach(async ({ page }) => { await installScheduling(page); await page.
 test('day view renders branch, dentist filter and appointment rows', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Appointment Calendar' })).toBeVisible()
   await expect(page.getByTestId('appointment-row')).toHaveCount(2)
-  await page.getByLabel('Dentist filter').selectOption('Dr. Ada')
+  await pickDropdown(page, 'Dentist filter', 'Dr. Ada')
   await expect(page.getByTestId('appointment-row')).toHaveCount(1)
-  await page.getByLabel('Dentist filter').selectOption('')
-  await page.getByLabel('Chair filter').selectOption('Chair 1')
+  await pickDropdown(page, 'Dentist filter', 'All dentists')
+  await pickDropdown(page, 'Chair filter', 'Chair 1')
   await expect(page.getByTestId('appointment-row')).toHaveCount(1)
-  await page.getByLabel('Chair filter').selectOption('')
+  await pickDropdown(page, 'Chair filter', 'All chairs')
   await expect(page.getByTestId('appointment-row')).toHaveCount(2)
 })
 
@@ -85,18 +86,95 @@ test('calendar API failure surfaces a status message and loading state', async (
   await expect(page.getByText(/synthetic|500/i).first()).toBeVisible()
 })
 
-test('appointment details panel shows lifecycle history and close button', async ({ page }) => {
-  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'Cancel' }).click()
-  const details = page.getByTestId('appointment-details')
-  await expect(details).toBeVisible()
-  await expect(details.getByRole('heading', { name: 'Lifecycle history' })).toBeVisible()
-  await expect(details.locator('li')).toHaveCount(1)
-  await details.getByRole('button', { name: 'Close details' }).click()
-  await expect(details).not.toBeVisible()
+test('appointment actions dialog lists remaining lifecycle actions and closes', async ({ page }) => {
+  // Lifecycle actions moved into an overflow dialog; the primary action stays inline.
+  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'More appointment actions' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: 'No show', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Close appointment actions' }).click()
+  await expect(dialog).not.toBeVisible()
+})
+
+test('cancelling an appointment announces the outcome in a toast', async ({ page }) => {
+  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'More appointment actions' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Cancel appointment?' })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel appointment', exact: true }).click()
+  const notifications = page.getByRole('region', { name: 'Notifications' })
+  await expect(notifications.getByText('Appointment cancelled')).toBeVisible()
+  await notifications.getByRole('button', { name: 'Dismiss notification' }).click()
+  await expect(notifications.getByText('Appointment cancelled')).toHaveCount(0)
+})
+
+test('a failed appointment update announces the error in a toast', async ({ page }) => {
+  await page.route(backendOnly, async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path.endsWith('/status')) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ detail: 'Synthetic failure' }) })
+    return route.fallback()
+  })
+  await page.getByTestId('appointment-row').nth(1).getByRole('button', { name: 'More appointment actions' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel appointment', exact: true }).click()
+  const notifications = page.getByRole('region', { name: 'Notifications' })
+  const failure = notifications.getByText('Synthetic failure')
+  await expect(failure).toBeVisible()
+  await expect(failure).not.toContainText('ApiError')
 })
 
 test('check-in workspace shows the empty queue state', async ({ page }) => {
   await page.goto('/workspace/check-in')
   await expect(page.getByRole('heading', { name: 'Patient arrival & queue' })).toBeVisible()
   await expect(page.getByText('No checked-in patients.')).toBeVisible()
+})
+
+test('book appointment dropdowns list their options and keep the chosen value', async ({ page }) => {
+  await page.getByRole('tab', { name: 'Book appointment' }).click()
+  const dentist = page.getByTestId('booking-dentist')
+  await expect(dentist).toHaveText('Select dentist')
+  await dentist.click()
+  const dentistListbox = page.getByRole('listbox', { name: 'Dentist' })
+  await expect(dentistListbox).toBeVisible()
+  await expect(dentistListbox.getByRole('option')).toHaveCount(2)
+  await dentistListbox.getByRole('option', { name: 'Dr. Abel' }).click()
+  await expect(dentist).toHaveText('Dr. Abel')
+  await expect(dentistListbox).toHaveCount(0)
+
+  const chair = page.getByTestId('booking-chair')
+  await chair.click()
+  await page.getByRole('listbox', { name: 'Chair' }).getByRole('option', { name: 'Chair 1' }).click()
+  await expect(chair).toHaveText('Chair 1')
+
+  const type = page.getByTestId('booking-type')
+  // Appointment types are required now; without a choice the trigger shows its placeholder.
+  await expect(type).toHaveText('Select appointment type')
+  await type.click()
+  await page.getByRole('listbox', { name: 'Appointment type' }).getByRole('option', { name: /Checkup/ }).click()
+  await expect(type).toHaveText('Checkup')
+  expect(await dropdownText(page, 'Appointment type')).toBe('Checkup')
+})
+
+test('dropdown opens with the keyboard and selects with arrows and enter', async ({ page }) => {
+  await page.getByRole('tab', { name: 'Book appointment' }).click()
+  const dentist = page.getByTestId('booking-dentist')
+  await dentist.focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.getByRole('listbox', { name: 'Dentist' })).toBeVisible()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+  await expect(dentist).toHaveText('Dr. Abel')
+  await expect(page.getByRole('listbox', { name: 'Dentist' })).toHaveCount(0)
+})
+
+test('dropdown closes on escape and on an outside click without changing the value', async ({ page }) => {
+  await page.getByRole('tab', { name: 'Book appointment' }).click()
+  const dentist = page.getByTestId('booking-dentist')
+  await dentist.click()
+  await expect(page.getByRole('listbox', { name: 'Dentist' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('listbox', { name: 'Dentist' })).toHaveCount(0)
+  await expect(dentist).toHaveText('Select dentist')
+  await dentist.click()
+  await page.getByRole('heading', { name: 'Book appointment' }).click()
+  await expect(page.getByRole('listbox', { name: 'Dentist' })).toHaveCount(0)
 })

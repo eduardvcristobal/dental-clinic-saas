@@ -45,7 +45,7 @@ class SchedulingSecurityTest {
         var principal=new UsernamePasswordAuthenticationToken(new AuthPrincipal(UUID.randomUUID(),clinic,"OWNER"),null);
         when(db.queryForObject(anyString(),eq(Boolean.class),eq(clinic),eq(dentist))).thenReturn(true);
         when(db.queryForObject(anyString(),eq(Boolean.class),eq(clinic),eq(branch))).thenReturn(true);
-        assertThrows(ResponseStatusException.class,()->api.setAvailability(principal,new SchedulingController.AvailabilityInput(dentist,branch,8,LocalTime.NOON,LocalTime.NOON.plusHours(1))));
+        assertThrows(ResponseStatusException.class,()->api.setAvailability(principal,new SchedulingController.AvailabilityInput(null,dentist,branch,8,LocalTime.NOON,LocalTime.NOON.plusHours(1))));
         verify(db,never()).update(anyString(),any(Object[].class));
     }
     @Test void readCalendarAlwaysFiltersByAuthenticatedClinic() {

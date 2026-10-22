@@ -1,4 +1,5 @@
 import { expect,test } from '@playwright/test'
+import { pickDropdown } from './dropdown'
 
 const backend=process.env.M4_BACKEND_URL??'http://127.0.0.1:8081'
 const jwks=process.env.M4_JWKS_URL??'http://127.0.0.1:17890'
@@ -31,10 +32,10 @@ test('clinician records odontogram findings, immutable corrections and cross-cli
  await expect(page.getByRole('heading',{name:'Synthetic Chart Patient'})).toBeVisible()
  await page.getByRole('tab',{name:'Odontogram'}).click()
  await expect(page.getByRole('heading',{name:/Odontogram/})).toBeVisible()
- await page.getByLabel('Dentition').selectOption('mixed')
+ await pickDropdown(page, 'Dentition', 'Mixed dentition')
  await page.getByRole('button',{name:'11'}).click()
- await page.getByLabel('Surface').selectOption('I')
- await page.getByLabel('Finding').selectOption('CARIES')
+ await pickDropdown(page, 'Surface', 'I')
+ await pickDropdown(page, 'Finding', 'CARIES')
  await page.getByLabel('Notes').fill('Synthetic chart observation, not patient data')
  await page.getByRole('button',{name:'Record new finding'}).click()
  await expect(page.getByText('OBSERVATION: CARIES')).toBeVisible()
@@ -48,7 +49,7 @@ test('clinician records odontogram findings, immutable corrections and cross-cli
  expect(chart.events[0].tooth_number).toBe(11)
  expect(chart.events[0].surface).toBe('I')
  await page.getByRole('button',{name:'Correct / retract'}).click()
- await page.getByLabel('Finding').selectOption('RESTORATION')
+ await pickDropdown(page, 'Finding', 'RESTORATION')
  await page.getByRole('button',{name:'Record correction'}).click()
  await expect(page.getByText('CORRECTION: RESTORATION')).toBeVisible()
  const revised=await request.get(path,{headers:headers(dentist.token)})
