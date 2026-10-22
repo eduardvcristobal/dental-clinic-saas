@@ -201,8 +201,9 @@ describe('statusTone', () => {
 })
 
 describe('blockColor', () => {
-  it('uses the configured type colour', () => {
-    expect(blockColor(block({ id: 'a', type_color: '#123456' }))).toBe('#123456')
+  it('uses lifecycle status colour even when an appointment type has a colour', () => {
+    expect(blockColor(block({ id: 'a', status: 'BOOKED', type_color: '#123456' }))).toBe('#3b82f6')
+    expect(blockColor(block({ id: 'b', status: 'CONFIRMED', type_color: '#123456' }))).toBe('#7c3aed')
   })
   it('falls back to a stable colour for types without one', () => {
     const first = blockColor(block({ id: 'a', activity: 'Cleaning' }))
