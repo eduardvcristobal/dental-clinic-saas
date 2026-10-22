@@ -320,7 +320,7 @@ test('command center day board lays the clinic day out as resource lanes', async
   await expect(board.getByRole('button', { name: /09:30 to 10:00, Filling, Cara Dela Cruz/ })).toBeVisible()
 
   // A longer visit is drawn wider than a shorter one on the same lane.
-  const width = async (name: RegExp) => Number((await board.getByRole('link', { name }).evaluate(node => node.style.width)).replace('%', ''))
+  const width = async (name: RegExp) => Number((await board.getByRole('button', { name }).evaluate(node => node.style.width)).replace('%', ''))
   expect(await width(/09:00 to 09:30, Checkup/)).toBeGreaterThan(0)
   expect(await width(/10:00 to 11:00, Scaling/)).toBeGreaterThan(await width(/09:00 to 09:30, Checkup/))
 
